@@ -12,17 +12,25 @@ from scipy import sparse
 from .config import LATS, LONS, RES, DEPTHS
 
 
+_NAMES = {"lat": ("lat", "latitude", "y", "nav_lat"), "lon": ("lon", "longitude", "x", "nav_lon"),
+          "depth": ("depth", "lev", "z")}
+
+
 def _std_coords(da: xr.DataArray) -> xr.DataArray:
-    ren = {}
-    for c in da.dims:
-        lc = c.lower()
-        if lc in ("latitude", "lat", "y"):
-            ren[c] = "lat"
-        elif lc in ("longitude", "lon", "x"):
-            ren[c] = "lon"
-        elif lc in ("depth", "lev", "z"):
-            ren[c] = "depth"
-    da = da.rename(ren)
+    """Normalise to 1-D *indexed* coords named lat / lon / depth, whatever the product's layout:
+    dims latitude/longitude with index coords (Copernicus), dims longitude/latitude with separate
+    non-index lat/lon variables (OSCAR v2), un-indexed coords, 0–360 longitudes, descending latitudes."""
+    for kind, names in _NAMES.items():
+        coord = next((c for c in da.coords if c.lower() in names and da[c].ndim == 1), None)
+        dim = da[coord].dims[0] if coord is not None else next((d for d in da.dims if d.lower() in names), None)
+        if dim is None:
+            continue
+        vals = da[coord].values if coord is not None else np.arange(da.sizes[dim])
+        drop = [c for c in da.coords if c != dim and dim in da[c].dims and da[c].ndim == 1]
+        da = da.drop_vars(drop + ([dim] if dim in da.coords else []))
+        if dim != kind:
+            da = da.rename({dim: kind})
+        da = da.assign_coords({kind: vals})
     if "lon" in da.dims and float(da.lon.max()) > 180:
         da = da.assign_coords(lon=((da.lon + 180) % 360) - 180).sortby("lon")
     if "lat" in da.dims:
