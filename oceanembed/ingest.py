@@ -101,6 +101,14 @@ def cmems_block(sources: list[C.Source], t0, t1, depth=False) -> xr.DataArray | 
 
 
 # ------------------------------------------------------------------ NASA PO.DAAC (OSCAR, CCMP)
+def _std_time(da: xr.DataArray) -> xr.DataArray:
+    """OSCAR v2 decodes time as cftime objects (non-standard calendar); make it numpy datetime64."""
+    if "time" in da.dims and not np.issubdtype(da["time"].dtype, np.datetime64):
+        da = da.assign_coords(time=pd.to_datetime([t.isoformat() for t in da["time"].values]))
+    return da
+
+
+
 def podaac_block(src: C.Source, t0, t1) -> xr.DataArray | None:
     import earthaccess
     res = earthaccess.search_data(short_name=src.dataset_id, temporal=(str(t0.date()), str(t1.date())),
@@ -117,8 +125,8 @@ def podaac_block(src: C.Source, t0, t1) -> xr.DataArray | None:
                 da = da.sel(lat=slice(C.LAT_MIN - 1, C.LAT_MAX + 1),
                             lon=slice(C.LON_MIN - 1, C.LON_MAX + 1)).load()
                 parts.append(da)
-        da = xr.concat(parts, "time").sortby("time")
-        return da.sel(time=slice(t0, t1 + pd.Timedelta(hours=23))) * src.scale + src.offset
+        da = xr.concat(parts, "time")
+        return _std_time(da).sortby("time").sel(time=slice(t0, t1 + pd.Timedelta(hours=23))) * src.scale + src.offset
     finally:
         shutil.rmtree(tmp, ignore_errors=True)   # keeps Colab disk flat
 
