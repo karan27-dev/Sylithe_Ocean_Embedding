@@ -7,10 +7,12 @@ over the North Indian Ocean from surface observations only. Built for SIH 2026, 
 
 ## Quick start
 
-**Data + training (Google Colab):**
-1. Copy the `oceanembed/` folder to `MyDrive/OceanEmbed/code/oceanembed/`.
-2. In Colab secrets add `CMEMS_USER`, `CMEMS_PASS`, `EARTHDATA_USER`, `EARTHDATA_PASS`.
-3. Run `colab/01_data_pipeline.ipynb` → `02_train.ipynb` (GPU) → `03_validate_export.ipynb`.
+**Data + training (Google Colab):** the notebooks clone this repo themselves, so nothing needs uploading.
+1. In Colab secrets (🔑) add `CMEMS_USER`, `CMEMS_PASS`, `EARTHDATA_USER`, `EARTHDATA_PASS` and enable notebook access.
+2. Run in order:
+   - [01 · Data pipeline](https://colab.research.google.com/github/karan27-dev/Sylithe_Ocean_Embedding/blob/main/colab/01_data_pipeline.ipynb)
+   - [02 · Train (GPU)](https://colab.research.google.com/github/karan27-dev/Sylithe_Ocean_Embedding/blob/main/colab/02_train.ipynb)
+   - [03 · Validate & export](https://colab.research.google.com/github/karan27-dev/Sylithe_Ocean_Embedding/blob/main/colab/03_validate_export.ipynb)
 
 **Console (local):**
 ```bash
