@@ -88,7 +88,10 @@ def cmems_open(dataset_id: str, variable: str, depth: bool = False) -> xr.DataAr
     import copernicusmarine as cm
     key = (dataset_id, variable)
     if key not in _CMEMS_CACHE:
-        kw = dict(dataset_id=dataset_id, variables=[variable], **C.BBOX)
+        # Force the map-optimised layout (chunks = 1 day × ~1000² cells). Over a 30-year span the client can
+        # otherwise pick "arco-time-series" (chunks = ~3000 days × 16² cells), and then every month we read
+        # drags in ~8 years of data per tile: that was the slowness and the RAM growth in the first full run.
+        kw = dict(dataset_id=dataset_id, variables=[variable], service="arco-geo-series", **C.BBOX)
         if depth:
             kw.update(minimum_depth=0, maximum_depth=C.GLORYS_MAX_DEPTH)
         _CMEMS_CACHE[key] = _std_coords(cm.open_dataset(**kw)[variable])   # lazy ARCO/Zarr, nothing downloaded yet
@@ -104,10 +107,11 @@ def cmems_block(sources: list[C.Source], t0, t1, depth=False) -> xr.DataArray | 
         tmin, tmax = pd.Timestamp(da.time.values[0]), pd.Timestamp(da.time.values[-1])
         if tmin <= t0 and tmax >= t1:
             da = da.sel(time=slice(t0, t1 + pd.Timedelta(hours=23)))
-            # load one day at a time and cast to float32 as it arrives: the whole block never exists as float64
+            # load 8 days at a time (fetched in parallel by dask) and cast to float32 as they arrive, so the
+            # whole block never exists as float64
             arr = np.empty(da.shape, dtype=np.float32)
-            for i in range(da.sizes["time"]):
-                arr[i] = da.isel(time=i).values
+            for i in range(0, da.sizes["time"], 8):
+                arr[i:i + 8] = da.isel(time=slice(i, i + 8)).values
             arr *= np.float32(s.scale); arr += np.float32(s.offset)
             return da.copy(data=arr)
     return None
