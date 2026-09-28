@@ -1,52 +1,89 @@
 """Independent validation against Argo float profiles (never seen in training).
 
-Profiles are fetched with argopy, QC-filtered ('standard' mode), interpolated to the PS standard
-depths with gap limits, then matched to the reconstruction (and to GLORYS / HYCOM for reference) at
-the nearest 0.25° cell on the same day.
+Profiles come straight from the Ifremer Argo ERDDAP (the server argopy itself queries), as CSV via
+pandas: no extra dependency to break. Standard Argo QC: delayed/adjusted mode ('D'/'A') uses the
+*_adjusted variables, real-time ('R') the raw ones, and only flags 1–2 (good / probably good) are kept
+for position, pressure and temperature. Profiles are then interpolated to the PS standard depths with
+gap limits and matched to the reconstruction (and GLORYS / HYCOM) at the nearest 0.25° cell, same day.
 """
 from __future__ import annotations
+
+import io
+import time
+import urllib.parse
+import urllib.request
 
 import numpy as np
 import pandas as pd
 
 from . import config as C
 
+ERDDAP = "https://erddap.ifremer.fr/erddap/tabledap/ArgoFloats.csv"
+COLS = ["platform_number", "cycle_number", "time", "latitude", "longitude", "position_qc", "data_mode",
+        "pres_adjusted", "pres_adjusted_qc", "temp_adjusted", "temp_adjusted_qc", "pres", "pres_qc", "temp", "temp_qc"]
+GOOD = {1, 2}
+
 # largest allowed gap between the two measurements bracketing a standard depth (m)
 MAX_GAP = lambda z: 15 if z <= 100 else (50 if z <= 300 else 150)
 
 
-def fetch_profiles(start=C.TEST[0], end=C.TEST[1], log=print) -> pd.DataFrame:
-    from argopy import DataFetcher
+def _query(t0: pd.Timestamp, t1: pd.Timestamp, bbox=None, retries=3) -> pd.DataFrame:
+    lat0, lat1, lon0, lon1 = bbox or (C.LAT_MIN, C.LAT_MAX, C.LON_MIN, C.LON_MAX)
+    cons = [f"latitude>={lat0}", f"latitude<={lat1}", f"longitude>={lon0}", f"longitude<={lon1}",
+            f"time>={t0:%Y-%m-%dT%H:%M:%SZ}", f"time<{t1:%Y-%m-%dT%H:%M:%SZ}", "pres<=1100"]
+    url = ERDDAP + "?" + ",".join(COLS) + "&" + "&".join(urllib.parse.quote(c, safe="=") for c in cons)
+    for k in range(retries):
+        try:
+            with urllib.request.urlopen(url, timeout=300) as r:
+                return pd.read_csv(io.BytesIO(r.read()), skiprows=[1])        # row 1 = units
+        except urllib.error.HTTPError as e:
+            if e.code == 404:                                                  # ERDDAP: "no matching rows"
+                return pd.DataFrame(columns=COLS)
+            err = e
+        except Exception as e:
+            err = e
+        time.sleep(5 * (k + 1))
+    raise err
+
+
+def _qc(df: pd.DataFrame) -> pd.DataFrame:
+    adj = df["data_mode"].isin(["A", "D"])
+    df = df.assign(
+        z=np.where(adj, df["pres_adjusted"], df["pres"]) * 0.99,               # dbar → m (≈1 % here)
+        t=np.where(adj, df["temp_adjusted"], df["temp"]),
+        zq=np.where(adj, df["pres_adjusted_qc"], df["pres_qc"]),
+        tq=np.where(adj, df["temp_adjusted_qc"], df["temp_qc"]),
+    )
+    ok = df["position_qc"].isin(GOOD) & df["zq"].isin(GOOD) & df["tq"].isin(GOOD) & df["z"].notna() & df["t"].notna()
+    return df[ok]
+
+
+def to_std_depths(z: np.ndarray, t: np.ndarray) -> list[float]:
+    o = np.argsort(z); z, t = z[o], t[o]
+    vals = []
+    for d in C.DEPTHS:
+        if d == 0:
+            vals.append(t[0] if z[0] <= 5 else np.nan); continue
+        j = np.searchsorted(z, d)
+        if j == 0 or j == z.size or (z[j] - z[j - 1]) > MAX_GAP(d):
+            vals.append(np.nan); continue
+        vals.append(float(np.interp(d, z[j - 1:j + 1], t[j - 1:j + 1])))
+    return vals
+
+
+def fetch_profiles(start=None, end=None, bbox=None, log=print) -> pd.DataFrame:
+    start, end = start or C.TEST[0], end or C.TEST[1]
     rows = []
     for m0 in pd.date_range(start, end, freq="MS"):
         m1 = m0 + pd.offsets.MonthBegin(1)
-        try:
-            ds = DataFetcher(src="erddap", mode="standard").region(
-                [C.LON_MIN, C.LON_MAX, C.LAT_MIN, C.LAT_MAX, 0, 1100, str(m0.date()), str(m1.date())]).to_xarray()
-        except Exception as e:
-            log(f"{m0:%Y-%m}: {e}"); continue
-        prof = ds.argo.point2profile()
-        P, T = prof["PRES"].values, prof["TEMP"].values
-        for i in range(prof.sizes["N_PROF"]):
-            z = P[i] * 0.99                     # dbar → m (≈1 % in this depth range; gsw.z_from_p for exact)
-            t = T[i]
-            ok = np.isfinite(z) & np.isfinite(t)
-            z, t = z[ok], t[ok]
-            if z.size < 5:
+        df = _qc(_query(m0, m1, bbox))
+        for (pl, cy), g in df.groupby(["platform_number", "cycle_number"]):
+            if len(g) < 5:
                 continue
-            o = np.argsort(z); z, t = z[o], t[o]
-            vals = []
-            for d in C.DEPTHS:
-                if d == 0:
-                    vals.append(t[0] if z[0] <= 5 else np.nan); continue
-                j = np.searchsorted(z, d)
-                if j == 0 or j == z.size or (z[j] - z[j - 1]) > MAX_GAP(d):
-                    vals.append(np.nan); continue
-                vals.append(np.interp(d, z[j - 1:j + 1], t[j - 1:j + 1]))
-            rows.append({"time": pd.Timestamp(prof["TIME"].values[i]).normalize(),
-                         "lat": float(prof["LATITUDE"].values[i]), "lon": float(prof["LONGITUDE"].values[i]),
-                         "platform": int(prof["PLATFORM_NUMBER"].values[i]),
-                         **{f"T{d}": v for d, v in zip(C.DEPTHS, vals)}})
+            rows.append({"time": pd.Timestamp(g["time"].iloc[0]).tz_localize(None).normalize(),
+                         "lat": float(g["latitude"].iloc[0]), "lon": float(g["longitude"].iloc[0]),
+                         "platform": int(pl), "cycle": int(cy),
+                         **{f"T{d}": v for d, v in zip(C.DEPTHS, to_std_depths(g["z"].values, g["t"].values))}})
         log(f"{m0:%Y-%m}: {len(rows)} profiles so far")
     return pd.DataFrame(rows)
 
