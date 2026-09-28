@@ -36,7 +36,7 @@ export default function Pipeline() {
         <h1 className="text-[26px] font-bold">Data Pipeline</h1>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[['Grid', '101 × 241', '0.25° · 5–30°N · 45–105°E'], ['Period', '2014–2023', '3,652 days · train ≤2021 · val 2022 · test 2023'],
+        {[['Grid', '101 × 241', '0.25° · 5–30°N · 45–105°E'], ['Period', '2005–2023', '6,939 days · train ≤2021 · val 2022 · test 2023'],
           ['Inputs', '7 channels', 'SST SSS SLA Uc Vc Uw Vw'], ['Target', '15 depths', '0 → 1000 m, GLORYS12']].map(([l, v, s]) => (
           <div key={l} className="card p-5">
             <p className="eyebrow mb-1">{l}</p>

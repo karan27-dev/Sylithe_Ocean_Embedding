@@ -8,7 +8,7 @@
 | Inputs | SST (OSTIA), SSS (SMOS/SMAP multi-obs), SLA (DUACS), surface currents (OSCAR), 10 m winds (CCMP) |
 | Target | GLORYS12 reanalysis temperature (moi-00021) |
 | Independent validation | Argo profiles (never trained on) + HYCOM (independent model) + INCOIS gridded Argo |
-| Period | 2014–2023: train 2014–2021, validate 2022, test 2023 |
+| Period | 2005–2023 (19 years): train 2005–2021, validate 2022, test 2023 |
 | Compute | Google Colab GPU with Google Drive storage. The laptop only runs the web console |
 | Output | CF-NetCDF `thetao(time, depth, lat, lon)` + `thetao_sigma` (uncertainty) + derived D20/D26/TCHP/MLD |
 
@@ -109,7 +109,7 @@ It does **not** host GLORYS, DUACS, SMAP/SMOS SSS, OSCAR or CCMP. Those need fre
 logins, stored as Colab secrets.
 
 ### 3.2 Design decisions
-- **Region writes into pre-allocated Zarr.** The full 3,652-day axis is created first. Each block writes its own slice
+- **Region writes into pre-allocated Zarr.** The full 6,939-day axis is created first. Each block writes its own slice
   and is logged in `<store>.done.json`, so a Colab disconnect costs at most one block.
 - **Area-mean, not interpolation, for finer grids.** A sparse (target × source) matrix with cos(lat) weights and
   NaN-aware normalisation. Coastal cells average the ocean part only, never land.
@@ -120,8 +120,15 @@ logins, stored as Colab secrets.
   DUACS SLA and mixing them would put a discontinuity into the input.
 
 ### 3.3 Volumes (float32 equivalent)
-Inputs 7 × 3,652 × 101 × 241 ≈ 2.5 GB. Target 15 × 3,652 × 101 × 241 ≈ 5.3 GB, or ≈ 2.7 GB as int16, less after
-compression (about 40 % of cells are land). The whole project fits in the free 15 GB of Drive.
+Inputs 7 × 6,939 × 101 × 241 ≈ 4.7 GB. Target 15 × 6,939 × 101 × 241 ≈ 10 GB, or ≈ 5 GB as int16, less after
+compression (about 48 % of cells are land). Expect roughly 5–7 GB on Drive in total, inside the free 15 GB.
+
+### 3.4 Why 2005–2023
+The paper fine-tuned on 30 years (1993–2022) and pretrained on Argo from 2005. We take 2005–2023: it is the dense-Argo
+era, so the GLORYS target is anchored to real profiles; satellite SSS exists from 2010 (SMOS) and 2015 (SMAP); and it
+spans many more monsoon, Indian Ocean Dipole and El Niño cycles, plus cyclone cold wakes, than 10 years would. Every input
+exists back to 1993, so extending to the paper's full 30 years is a one-line change in `config.py` (at ~1.6× the download
+time and Drive space).
 
 ---
 
