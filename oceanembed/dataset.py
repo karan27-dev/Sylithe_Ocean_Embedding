@@ -76,11 +76,11 @@ class SurfaceWindows(Dataset):
         self.var_dropout, self.patch_mask = var_dropout, patch_mask
         ds = xr.open_zarr(inputs_path)
         self.time = pd.DatetimeIndex(ds.time.values)
-        # whole input record in RAM as float16 (~1.3 GB for 10 years)
-        raw = np.stack([ds[v].values for v in C.INPUT_VARS]).astype("f4")    # (V, N, H, W)
+        # whole input record in RAM as float16 (~2.4 GB for 2005–2023). Normalised one variable at a time
+        # so the float32 copy never exists for all 7 at once (that would peak near 5 GB).
+        self.inp = np.empty((len(C.INPUT_VARS), ds.sizes["time"], len(C.LATS), len(C.LONS)), dtype="f2")
         for i, v in enumerate(C.INPUT_VARS):
-            raw[i] = (raw[i] - stats[f"{v}_mean"]) / stats[f"{v}_std"]
-        self.inp = raw.astype("f2")
+            self.inp[i] = (ds[v].values.astype("f4") - stats[f"{v}_mean"]) / stats[f"{v}_std"]
         self.T = xr.open_zarr(target_path)["thetao"] if need_target else None
         # searchsorted (not get_loc) so the same class works on the monthly stores of the Argo stage
         t0 = int(self.time.searchsorted(pd.Timestamp(period[0])))
