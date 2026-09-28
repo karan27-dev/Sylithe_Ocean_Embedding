@@ -19,13 +19,14 @@ from .model import N_STATIC
 # ------------------------------------------------------------------ statistics (train period only)
 def compute_stats(inputs_path, target_path, out_path, smooth_days=31):
     ds_in = xr.open_zarr(inputs_path).sel(time=slice(*C.TRAIN))
+    T = xr.open_zarr(target_path)["thetao"].sel(time=slice(*C.TRAIN))
+    ocean_da = T.isel(time=0, depth=0).notnull().compute()        # GLORYS sea mask (winds/SST also cover land/lakes)
     stats = {}
     for v in C.INPUT_VARS:
-        a = ds_in[v]
+        a = ds_in[v].where(ocean_da.values)
         stats[f"{v}_mean"] = float(a.mean(skipna=True).compute())
         stats[f"{v}_std"] = float(a.std(skipna=True).compute()) or 1.0
 
-    T = xr.open_zarr(target_path)["thetao"].sel(time=slice(*C.TRAIN))
     clim = T.groupby("time.dayofyear").mean("time").compute()
     # guarantee all 366 slots so clim[doy-1] is always the right day (doy 366 only exists in leap years)
     present = clim.dayofyear.values
@@ -79,8 +80,11 @@ class SurfaceWindows(Dataset):
         # whole input record in RAM as float16 (~2.4 GB for 2005–2023). Normalised one variable at a time
         # so the float32 copy never exists for all 7 at once (that would peak near 5 GB).
         self.inp = np.empty((len(C.INPUT_VARS), ds.sizes["time"], len(C.LATS), len(C.LONS)), dtype="f2")
+        land = stats["ocean"] <= 0
         for i, v in enumerate(C.INPUT_VARS):
-            self.inp[i] = (ds[v].values.astype("f4") - stats[f"{v}_mean"]) / stats[f"{v}_std"]
+            a = (ds[v].values.astype("f4") - stats[f"{v}_mean"]) / stats[f"{v}_std"]
+            a[:, land] = np.nan                                   # land → "missing", never a value
+            self.inp[i] = a
         self.T = xr.open_zarr(target_path)["thetao"] if need_target else None
         # searchsorted (not get_loc) so the same class works on the monthly stores of the Argo stage
         t0 = int(self.time.searchsorted(pd.Timestamp(period[0])))
