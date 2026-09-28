@@ -17,9 +17,11 @@ BBOX = dict(minimum_longitude=LON_MIN - RES, maximum_longitude=LON_MAX + RES,
 # PS standard depths (m)
 DEPTHS = [0, 5, 10, 20, 30, 50, 75, 100, 125, 150, 200, 300, 500, 700, 1000]
 
-# ---------------------------------------------------------------- periods (10 years)
-START, END = "2014-01-01", "2023-12-31"
-TRAIN = ("2014-01-01", "2021-12-31")
+# ---------------------------------------------------------------- periods (19 years)
+# 2005 onward = the dense-Argo era, so GLORYS is well constrained by real profiles; satellite SSS from 2010.
+# Wang et al. (ESSD 2026) fine-tuned on 1993–2022 and pretrained on Argo 2005–2019; every input here exists from 1993.
+START, END = "2005-01-01", "2023-12-31"
+TRAIN = ("2005-01-01", "2021-12-31")
 VAL = ("2022-01-01", "2022-12-31")
 TEST = ("2023-01-01", "2023-12-31")      # held-out year, also used for the independent Argo check
 
@@ -71,7 +73,7 @@ SOURCES = {
 }
 
 # PS target: GLORYS12 (moi-00021). Checked 2026-09-29: the "my" dataset now runs 1993-01-01 → 2026-06-23,
-# covering the whole 2014–2023 period; the old "myint" continuation ID no longer exists.
+# covering the whole 2005–2023 period; the old "myint" continuation ID no longer exists.
 GLORYS_IDS = ["cmems_mod_glo_phy_my_0.083deg_P1D-m"]
 GLORYS_VAR = "thetao"
 GLORYS_MAX_DEPTH = 1300   # one level below 1000 m so vertical interpolation is not an extrapolation
