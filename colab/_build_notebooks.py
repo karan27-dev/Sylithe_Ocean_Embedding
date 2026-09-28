@@ -14,14 +14,15 @@ def nb(cells):
                          "kernelspec": {"name": "python3", "display_name": "Python 3"}}}
 
 SETUP = ("code", r'''
-# ── Setup: Drive + code + deps ─────────────────────────────────────────────
+# ── Setup: Drive (data) + GitHub (code) + deps ──────────────────────────────
 from google.colab import drive, userdata
 drive.mount('/content/drive')
 ROOT = '/content/drive/MyDrive/OceanEmbed'          # data, checkpoints, outputs live here
-CODE = f'{ROOT}/code'                               # upload the local OceanEmbed/oceanembed folder here
+REPO = '/content/Sylithe_Ocean_Embedding'
 import os, sys; os.makedirs(ROOT, exist_ok=True)
-assert os.path.exists(f'{CODE}/oceanembed/__init__.py'), 'Upload the oceanembed/ package to MyDrive/OceanEmbed/code/'
-sys.path.insert(0, CODE)
+if os.path.exists(REPO): !git -C {REPO} pull -q
+else: !git clone -q https://github.com/karan27-dev/Sylithe_Ocean_Embedding {REPO}
+sys.path.insert(0, REPO)
 !pip -q install copernicusmarine earthaccess argopy "xarray>=2024.6" zarr dask netcdf4 earthengine-api
 ''')
 
