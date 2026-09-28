@@ -48,7 +48,7 @@ def bin_matrix(src_lat: np.ndarray, src_lon: np.ndarray) -> sparse.csr_matrix:
     ok = (YY >= 0) & (YY < len(LATS)) & (XX >= 0) & (XX < len(LONS))
     rows = (YY * len(LONS) + XX)[ok]
     cols = np.arange(YY.size).reshape(YY.shape)[ok]
-    return sparse.csr_matrix((w[ok], (rows, cols)), shape=(len(LATS) * len(LONS), YY.size))
+    return sparse.csr_matrix((w[ok].astype(np.float32), (rows, cols)), shape=(len(LATS) * len(LONS), YY.size))
 
 
 def bin_average(da: xr.DataArray, M: sparse.csr_matrix | None = None) -> xr.DataArray:
@@ -59,14 +59,17 @@ def bin_average(da: xr.DataArray, M: sparse.csr_matrix | None = None) -> xr.Data
     lead = [d for d in da.dims if d not in ("lat", "lon")]
     da = da.transpose(*lead, "lat", "lon")
     x = da.values.reshape(-1, da.sizes["lat"] * da.sizes["lon"])
-    valid = np.isfinite(x)
-    num = (M @ np.where(valid, x, 0.0).T).T
-    den = (M @ valid.T.astype(np.float64)).T
-    with np.errstate(invalid="ignore", divide="ignore"):
-        out = np.where(den > 0, num / den, np.nan)
+    out = np.empty((x.shape[0], M.shape[0]), dtype=np.float32)
+    for i in range(0, x.shape[0], 8):            # 8 time/depth slices at a time keeps the temporaries small
+        xc = x[i:i + 8].astype(np.float32, copy=False)
+        valid = np.isfinite(xc)
+        num = (M @ np.where(valid, xc, np.float32(0)).T).T
+        den = (M @ valid.T.astype(np.float32)).T
+        with np.errstate(invalid="ignore", divide="ignore"):
+            out[i:i + 8] = np.where(den > 0, num / den, np.nan)
     shape = [da.sizes[d] for d in lead] + [len(LATS), len(LONS)]
     coords = {d: da[d] for d in lead} | {"lat": LATS, "lon": LONS}
-    return xr.DataArray(out.reshape(shape).astype(np.float32), dims=lead + ["lat", "lon"],
+    return xr.DataArray(out.reshape(shape), dims=lead + ["lat", "lon"],
                         coords=coords, name=da.name, attrs=da.attrs)
 
 
@@ -80,12 +83,27 @@ def to_target_grid(da: xr.DataArray, M=None) -> xr.DataArray:
 
 def to_std_depths(da: xr.DataArray) -> xr.DataArray:
     """Linear interpolation in depth. 0 m takes the shallowest model level (GLORYS top ≈ 0.49 m).
-    Columns shallower than a standard depth stay NaN (sea floor), never extrapolated."""
+    Columns shallower than a standard depth stay NaN (sea floor), never extrapolated.
+    Every column shares the same source levels, so each target level is a weighted sum of the two
+    bracketing source levels, computed in float32 one level at a time (xarray/scipy interp upcasts the
+    whole block to float64 and needs ~4× its size in temporaries)."""
     da = _std_coords(da)
-    top = float(da.depth.min())
-    tgt = np.clip(np.array(DEPTHS, dtype=float), top, None)
-    out = da.interp(depth=tgt, method="linear")
-    return out.assign_coords(depth=np.array(DEPTHS, dtype=float))
+    src = da.depth.values.astype(float)
+    ax = da.dims.index("depth")
+    a = da.values
+    tgt = np.clip(np.array(DEPTHS, dtype=float), src[0], None)
+    shape = list(a.shape); shape[ax] = len(DEPTHS)
+    out = np.full(shape, np.nan, dtype=np.float32)
+    for i, z in enumerate(tgt):
+        if z > src[-1]:
+            continue                                                  # below the deepest level: stays NaN
+        k = int(np.clip(np.searchsorted(src, z), 1, len(src) - 1))
+        w = np.float32((z - src[k - 1]) / (src[k] - src[k - 1]))
+        lo, hi = np.take(a, k - 1, axis=ax), np.take(a, k, axis=ax)
+        idx = [slice(None)] * a.ndim; idx[ax] = i
+        out[tuple(idx)] = lo * (np.float32(1) - w) + hi * w           # NaN below the sea floor propagates
+    coords = {d: da[d] for d in da.dims if d != "depth"} | {"depth": np.array(DEPTHS, dtype=float)}
+    return xr.DataArray(out, dims=da.dims, coords=coords, name=da.name, attrs=da.attrs)
 
 
 def daily_mean(da: xr.DataArray) -> xr.DataArray:
