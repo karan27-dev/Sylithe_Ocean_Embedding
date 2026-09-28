@@ -70,8 +70,9 @@ SOURCES = {
     "vw": [Source("vw", "podaac", "CCMP_WINDS_10M6HR_L4_V3.1", "vwnd")],
 }
 
-# PS target: GLORYS12 (moi-00021). "my" covers ~1993→mid-2021, "myint" continues it.
-GLORYS_IDS = ["cmems_mod_glo_phy_my_0.083deg_P1D-m", "cmems_mod_glo_phy_myint_0.083deg_P1D-m"]
+# PS target: GLORYS12 (moi-00021). Checked 2026-09-29: the "my" dataset now runs 1993-01-01 → 2026-06-23,
+# covering the whole 2014–2023 period; the old "myint" continuation ID no longer exists.
+GLORYS_IDS = ["cmems_mod_glo_phy_my_0.083deg_P1D-m"]
 GLORYS_VAR = "thetao"
 GLORYS_MAX_DEPTH = 1300   # one level below 1000 m so vertical interpolation is not an extrapolation
 
