@@ -191,7 +191,12 @@ def ingest_inputs(root: str, variables=C.INPUT_VARS, days_per_block=31, log=prin
             if da is None:
                 log(f"!! {var} {t0.date()}–{t1.date()}: no source, left NaN")
                 continue
-            da = daily_mean(da)
+            da = daily_mean(_std_coords(da))
+            # surface products may carry a length-1 vertical axis (e.g. multi-obs SSS has depth=[0]); drop it
+            extra = [d for d in da.dims if d not in ("time", "lat", "lon")]
+            if any(da.sizes[d] != 1 for d in extra):
+                raise ValueError(f"{var}: unexpected non-singleton dims {extra}")
+            da = da.isel({d: 0 for d in extra}, drop=True)
             grid_key = (da.sizes["lat"], da.sizes["lon"])
             if grid_key not in M_cache and float(np.abs(np.diff(da.lat.values)).mean()) < C.RES * 0.8:
                 M_cache[grid_key] = bin_matrix(da.lat.values, da.lon.values)
