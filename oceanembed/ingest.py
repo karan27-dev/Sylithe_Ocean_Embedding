@@ -12,7 +12,8 @@ import json
 import os
 import shutil
 import tempfile
-from concurrent.futures import ThreadPoolExecutor
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import numpy as np
 import pandas as pd
@@ -48,9 +49,15 @@ def _done(path):
     return set(json.load(open(p))) if os.path.exists(p) else set()
 
 
+_MARK_LOCK = threading.Lock()
+
+
 def _mark(path, key):
-    s = _done(path); s.add(key)
-    json.dump(sorted(s), open(path + ".done.json", "w"))
+    with _MARK_LOCK:                              # parallel workers must not overwrite each other's progress
+        s = _done(path); s.add(key)
+        tmp = path + ".done.json.tmp"
+        json.dump(sorted(s), open(tmp, "w"))
+        os.replace(tmp, path + ".done.json")      # atomic: a disconnect never leaves a half-written file
 
 
 def write_block(path: str, da: xr.DataArray, name: str):
@@ -109,24 +116,52 @@ def _std_time(da: xr.DataArray) -> xr.DataArray:
 
 
 
+_PODAAC_CACHE: dict = {}
+_PODAAC_LOCKS: dict = {}
+_PODAAC_GUARD = threading.Lock()
+
+
 def podaac_block(src: C.Source, t0, t1) -> xr.DataArray | None:
+    """Download a block of global files once and extract every variable we use from that dataset
+    (OSCAR u+v, CCMP uwnd+vwnd), so the second component comes from cache instead of a re-download."""
+    key = (src.dataset_id, t0)
+    with _PODAAC_GUARD:
+        lock = _PODAAC_LOCKS.setdefault(key, threading.Lock())
+    with lock:
+        if key not in _PODAAC_CACHE:
+            _PODAAC_CACHE[key] = _podaac_download(src.dataset_id, t0, t1)
+        cached = _PODAAC_CACHE[key]
+        if cached is None:
+            del _PODAAC_CACHE[key]
+            return None
+        da = cached.pop(src.variable)
+        if not cached:
+            del _PODAAC_CACHE[key]                # both components taken: free memory; a retry re-downloads
+    return da * src.scale + src.offset
+
+
+def _podaac_download(dataset_id, t0, t1) -> dict | None:
     import earthaccess
-    res = earthaccess.search_data(short_name=src.dataset_id, temporal=(str(t0.date()), str(t1.date())),
+    names = sorted({s.variable for v in C.SOURCES.values() for s in v if s.dataset_id == dataset_id})
+    res = earthaccess.search_data(short_name=dataset_id, temporal=(str(t0.date()), str(t1.date())),
                                   bounding_box=(C.LON_MIN, C.LAT_MIN, C.LON_MAX, C.LAT_MAX))
     if not res:
         return None
     tmp = tempfile.mkdtemp(dir="/content" if os.path.isdir("/content") else None)
     try:
         files = earthaccess.download(res, tmp)
-        parts = []
+        parts = {n: [] for n in names}
         for f in sorted(files):
             with xr.open_dataset(f) as ds:
-                da = _std_coords(ds[src.variable])
-                da = da.sel(lat=slice(C.LAT_MIN - 1, C.LAT_MAX + 1),
-                            lon=slice(C.LON_MIN - 1, C.LON_MAX + 1)).load()
-                parts.append(da)
-        da = xr.concat(parts, "time")
-        return _std_time(da).sortby("time").sel(time=slice(t0, t1 + pd.Timedelta(hours=23))) * src.scale + src.offset
+                for n in names:
+                    da = _std_coords(ds[n])
+                    parts[n].append(da.sel(lat=slice(C.LAT_MIN - 1, C.LAT_MAX + 1),
+                                           lon=slice(C.LON_MIN - 1, C.LON_MAX + 1)).load())
+        out = {}
+        for n in names:
+            da = _std_time(xr.concat(parts[n], "time")).sortby("time")
+            out[n] = da.sel(time=slice(t0, t1 + pd.Timedelta(hours=23)))
+        return out
     finally:
         shutil.rmtree(tmp, ignore_errors=True)   # keeps Colab disk flat
 
@@ -173,68 +208,92 @@ def hycom_day(day: pd.Timestamp) -> np.ndarray:
 
 
 # ------------------------------------------------------------------ drivers
-def ingest_inputs(root: str, variables=C.INPUT_VARS, days_per_block=31, log=print):
+def _fetch_input(var, t0, t1, log):
+    for src in C.SOURCES[var]:
+        try:
+            if src.provider == "cmems":
+                da = cmems_block([src], t0, t1)
+            elif src.provider == "podaac":
+                da = podaac_block(src, t0, t1)
+            else:
+                da = gee_block(src, t0, t1)
+        except Exception as e:   # a failing source falls through to the next one
+            log(f"  {var} {t0.date()} {src.provider}:{src.dataset_id} failed: {e!r}")
+            da = None
+        if da is not None and da.sizes.get("time", 0):
+            return da
+    return None
+
+
+def _ingest_input_block(path, var, t0, t1, M_cache, log):
+    da = _fetch_input(var, t0, t1, log)
+    if da is None:
+        return f"!! {var} {t0.date()}–{t1.date()}: no source, left NaN"
+    da = daily_mean(_std_coords(da))
+    # surface products may carry a length-1 vertical axis (e.g. multi-obs SSS has depth=[0]); drop it
+    extra = [d for d in da.dims if d not in ("time", "lat", "lon")]
+    if any(da.sizes[d] != 1 for d in extra):
+        raise ValueError(f"{var}: unexpected non-singleton dims {extra}")
+    da = da.isel({d: 0 for d in extra}, drop=True)
+    grid_key = (da.sizes["lat"], da.sizes["lon"], float(da.lat[0]), float(da.lon[0]))
+    if grid_key not in M_cache and float(np.abs(np.diff(da.lat.values)).mean()) < C.RES * 0.8:
+        M_cache[grid_key] = bin_matrix(da.lat.values, da.lon.values)
+    da = to_target_grid(da, M_cache.get(grid_key))
+    da = da.reindex(time=pd.date_range(t0, t1, freq="D"))
+    write_block(path, da, var)
+    _mark(path, f"{var}:{t0.date()}")
+    return f"ok {var} {t0.date()}–{t1.date()}  ocean-valid={float(np.isfinite(da).mean()):.2f}"
+
+
+def _run(tasks, fn, workers, log):
+    """Run blocks in parallel threads (the work is network-bound). Each block writes its own time slice
+    of the store (chunks are one day), so parallel writes never touch the same chunk."""
+    failures = 0
+    with ThreadPoolExecutor(workers) as ex:
+        futs = {ex.submit(fn, *t): t for t in tasks}
+        for i, f in enumerate(as_completed(futs), 1):
+            try:
+                msg = f.result()
+            except Exception as e:
+                failures += 1
+                msg = f"!! {futs[f][:3]} crashed: {e!r}"
+            log(f"[{i}/{len(tasks)}] {msg}")
+    log(f"done: {len(tasks) - failures} ok, {failures} failed (re-run the cell to retry only the failures)")
+
+
+def ingest_inputs(root: str, variables=C.INPUT_VARS, days_per_block=31, workers=6, log=print):
     path = os.path.join(root, "inputs.zarr")
     init_store(path, C.INPUT_VARS, with_depth=False)
-    M_cache: dict = {}
-    for var in variables:
-        for t0, t1 in blocks(C.START, C.END, days_per_block):
-            key = f"{var}:{t0.date()}"
-            if key in _done(path):
-                continue
-            da = None
-            for src in C.SOURCES[var]:
-                try:
-                    if src.provider == "cmems":
-                        da = cmems_block([src], t0, t1)
-                    elif src.provider == "podaac":
-                        da = podaac_block(src, t0, t1)
-                    elif src.provider == "gee":
-                        da = gee_block(src, t0, t1)
-                except Exception as e:   # a failing source falls through to the next one
-                    log(f"  {var} {t0.date()} {src.provider}:{src.dataset_id} failed: {e}")
-                    da = None
-                if da is not None and da.sizes.get("time", 0):
-                    break
-            if da is None:
-                log(f"!! {var} {t0.date()}–{t1.date()}: no source, left NaN")
-                continue
-            da = daily_mean(_std_coords(da))
-            # surface products may carry a length-1 vertical axis (e.g. multi-obs SSS has depth=[0]); drop it
-            extra = [d for d in da.dims if d not in ("time", "lat", "lon")]
-            if any(da.sizes[d] != 1 for d in extra):
-                raise ValueError(f"{var}: unexpected non-singleton dims {extra}")
-            da = da.isel({d: 0 for d in extra}, drop=True)
-            grid_key = (da.sizes["lat"], da.sizes["lon"])
-            if grid_key not in M_cache and float(np.abs(np.diff(da.lat.values)).mean()) < C.RES * 0.8:
-                M_cache[grid_key] = bin_matrix(da.lat.values, da.lon.values)
-            da = to_target_grid(da, M_cache.get(grid_key))
-            da = da.reindex(time=pd.date_range(t0, t1, freq="D"))
-            write_block(path, da, var)
-            _mark(path, key)
-            log(f"ok {var} {t0.date()}–{t1.date()}  ocean-valid={float(np.isfinite(da).mean()):.2f}")
+    done, M_cache = _done(path), {}
+    # block-major order, so paired components (uc/vc, uw/vw) of a block run close together and share a download
+    tasks = [(path, v, t0, t1, M_cache, log) for t0, t1 in blocks(C.START, C.END, days_per_block)
+             for v in variables if f"{v}:{t0.date()}" not in done]
+    log(f"inputs: {len(tasks)} blocks to fetch with {workers} workers")
+    _run(tasks, _ingest_input_block, workers, log)
 
 
-def ingest_glorys(root: str, days_per_block=8, log=print):
+def _ingest_glorys_block(path, srcs, t0, t1, M_box, log):
+    da = cmems_block(srcs, t0, t1, depth=True)
+    if da is None:
+        return f"!! GLORYS {t0.date()}–{t1.date()}: not covered by {[s.dataset_id for s in srcs]}"
+    da = to_std_depths(da)                      # vertical first: 15 levels instead of ~35
+    if not M_box:
+        M_box.append(bin_matrix(da.lat.values, da.lon.values))
+    da = to_target_grid(da, M_box[0])
+    write_block(path, da, "thetao")
+    _mark(path, f"thetao:{t0.date()}")
+    return f"ok GLORYS {t0.date()}–{t1.date()}"
+
+
+def ingest_glorys(root: str, days_per_block=8, workers=4, log=print):
     path = os.path.join(root, "target.zarr")
     init_store(path, ["thetao"], with_depth=True, encode_int16=True)
     srcs = [C.Source("thetao", "cmems", i, C.GLORYS_VAR) for i in C.GLORYS_IDS]
-    M = None
-    for t0, t1 in blocks(C.START, C.END, days_per_block):
-        key = f"thetao:{t0.date()}"
-        if key in _done(path):
-            continue
-        da = cmems_block(srcs, t0, t1, depth=True)
-        if da is None:   # block straddles the my/myint seam → do it day by day
-            parts = [cmems_block(srcs, d, d, depth=True) for d in pd.date_range(t0, t1)]
-            da = xr.concat([p for p in parts if p is not None], "time")
-        da = to_std_depths(da)                      # vertical first: 15 levels instead of ~30
-        if M is None:
-            M = bin_matrix(da.lat.values, da.lon.values)
-        da = to_target_grid(da, M)
-        write_block(path, da, "thetao")
-        _mark(path, key)
-        log(f"ok GLORYS {t0.date()}–{t1.date()}")
+    done, M_box = _done(path), []
+    tasks = [(path, srcs, t0, t1, M_box, log) for t0, t1 in blocks(C.START, C.END, days_per_block)
+             if f"thetao:{t0.date()}" not in done]
+    log(f"GLORYS: {len(tasks)} blocks to fetch with {workers} workers")
+    _run(tasks, _ingest_glorys_block, workers, log)
 
 
 def ingest_hycom(root: str, start=None, end=None, workers=16, log=print):
