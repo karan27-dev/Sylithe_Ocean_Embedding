@@ -45,10 +45,22 @@ disconnect and it continues from `<store>.done.json`.
 SETUP,
 ("code", r'''
 # ── Credentials ───────────────────────────────────────────────────────────
-import copernicusmarine, earthaccess, ee
-copernicusmarine.login(username=userdata.get('CMEMS_USER'), password=userdata.get('CMEMS_PASS'), force_overwrite=True)
-os.environ['EARTHDATA_USERNAME'] = userdata.get('EARTHDATA_USER')
-os.environ['EARTHDATA_PASSWORD'] = userdata.get('EARTHDATA_PASS')
+# Do NOT type usernames/passwords here. Put them in the 🔑 Secrets panel (left bar) under exactly
+# these four NAMES, with "Notebook access" switched on. This cell only reads them by name.
+try:
+    import copernicusmarine, earthaccess, ee
+except ModuleNotFoundError:
+    raise SystemExit('Run the Setup cell above first (it installs copernicusmarine, earthaccess, ...).')
+from google.colab.userdata import SecretNotFoundError, NotebookAccessError
+secrets = {}
+for name in ['CMEMS_USER', 'CMEMS_PASS', 'EARTHDATA_USER', 'EARTHDATA_PASS']:
+    try:
+        secrets[name] = userdata.get(name)
+    except (SecretNotFoundError, NotebookAccessError):
+        raise SystemExit(f'Secret "{name}" is missing or has Notebook access switched off: add it in 🔑 Secrets.')
+copernicusmarine.login(username=secrets['CMEMS_USER'], password=secrets['CMEMS_PASS'], force_overwrite=True)
+os.environ['EARTHDATA_USERNAME'] = secrets['EARTHDATA_USER']
+os.environ['EARTHDATA_PASSWORD'] = secrets['EARTHDATA_PASS']
 earthaccess.login(strategy='environment')
 ee.Authenticate(); ee.Initialize(project='syltihe')
 print('all providers authenticated')
