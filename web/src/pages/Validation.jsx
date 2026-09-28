@@ -49,7 +49,7 @@ export default function Validation() {
                 <LineChart data={rows} layout="vertical">
                   <CartesianGrid stroke="#eef0f2" />
                   <XAxis type="number" tick={{ fontSize: 10, fontFamily: 'DM Mono', fill: '#94a3b8' }} />
-                  <YAxis type="number" dataKey="depth" reversed scale="sqrt" domain={[0, 1000]} ticks={[0, 50, 100, 200, 300, 500, 1000]}
+                  <YAxis type="number" dataKey="depth" scale="sqrt" domain={[0, 1000]} ticks={[0, 50, 100, 200, 300, 500, 1000]}
                     tick={{ fontSize: 10, fontFamily: 'DM Mono', fill: '#94a3b8' }} width={40} unit="m" />
                   <Tooltip />
                   {SERIES.map((s) => (

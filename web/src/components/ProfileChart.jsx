@@ -29,7 +29,7 @@ export default function ProfileChart({ series }) {
           <CartesianGrid stroke="#eef0f2" />
           <XAxis type="number" domain={[lo, hi]} tick={{ fontSize: 10, fill: '#94a3b8', fontFamily: 'DM Mono' }}
             tickLine={false} axisLine={{ stroke: '#e5e7eb' }} unit="°" />
-          <YAxis type="number" dataKey="depth" reversed scale="sqrt" domain={[0, 1000]}
+          <YAxis type="number" dataKey="depth" scale="sqrt" domain={[0, 1000]}
             ticks={[0, 20, 50, 100, 200, 300, 500, 1000]} tick={{ fontSize: 10, fill: '#94a3b8', fontFamily: 'DM Mono' }}
             tickLine={false} axisLine={{ stroke: '#e5e7eb' }} width={40} unit="m" />
           <ReferenceLine x={26} stroke="#94a3b8" strokeDasharray="3 3" />
