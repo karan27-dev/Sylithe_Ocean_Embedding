@@ -1,0 +1,11 @@
+node_modules/
+web/dist/
+__pycache__/
+*.pyc
+.DS_Store
+.env
+*.zarr/
+*.done.json
+checkpoints/
+*.pt
+*.nc
