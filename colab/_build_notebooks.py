@@ -25,6 +25,9 @@ if os.path.exists(REPO):
 else:
     !git clone -q https://github.com/karan27-dev/Sylithe_Ocean_Embedding {REPO}
 sys.path.insert(0, REPO)
+for m in [m for m in sys.modules if m.startswith('oceanembed')]:
+    del sys.modules[m]                              # re-running this cell picks up freshly pulled code
+!git -C {REPO} log --oneline -1
 # Colab already ships xarray, dask, netCDF4 and earthengine-api. Install only what is missing, one
 # package at a time, so pip never has to search a large version space (that is what hangs).
 !pip install -q --upgrade-strategy only-if-needed copernicusmarine
@@ -37,14 +40,14 @@ for m in ['xarray', 'zarr', 'dask', 'netCDF4', 'ee', 'copernicusmarine', 'eartha
 
 NB1 = [
 ("markdown", """
-# 01 · Data pipeline — 10 years of surface inputs + GLORYS target → Zarr on Drive
+# 01 · Data pipeline — 19 years (2005–2023) of surface inputs + GLORYS target → Zarr on Drive
 Runs entirely on Colab. Nothing touches the laptop disk. Every step is **resumable**: re-run a cell after a
 disconnect and it continues from `<store>.done.json`.
 
 | Store | Contents | Size (approx) |
 |---|---|---|
-| `inputs.zarr` | SST (OSTIA), SSS (CMEMS multi-obs), SLA (DUACS), currents (OSCAR), winds (CCMP), 2014–2023 daily, 0.25° | ~1.5 GB |
-| `target.zarr` | GLORYS12 θ at 15 standard depths, int16 (0.001 °C) | ~2.5 GB |
+| `inputs.zarr` | SST (OSTIA), SSS (CMEMS multi-obs), SLA (DUACS), currents (OSCAR), winds (CCMP), 2005–2023 daily, 0.25° | ~3 GB |
+| `target.zarr` | GLORYS12 θ at 15 standard depths, int16 (0.001 °C) | ~3–5 GB |
 | `hycom.zarr` | HYCOM via **your GEE** (test year, independent comparator) | ~0.3 GB |
 | `argo_2023.parquet` | Argo profiles for independent validation | small |
 
@@ -90,7 +93,8 @@ for sn in ['OSCAR_L4_OC_FINAL_V2.0', 'CCMP_WINDS_10M6HR_L4_V3.1']:
 '''),
 ("code", r'''
 # ── Dry run: one month of every input into a scratch store, then look at it ──
-from oceanembed import ingest
+from oceanembed import config as C, ingest
+FULL = (C.START, C.END)
 C.START, C.END = '2023-01-01', '2023-01-31'
 ingest.ingest_inputs('/content/dry', days_per_block=31)
 import xarray as xr, matplotlib.pyplot as plt
@@ -98,10 +102,12 @@ d = xr.open_zarr('/content/dry/inputs.zarr').isel(time=14)
 fig, ax = plt.subplots(2, 4, figsize=(20, 7))
 for a, v in zip(ax.flat, C.INPUT_VARS): d[v].plot(ax=a, cmap='RdYlBu_r'); a.set_title(v)
 ax.flat[-1].axis('off'); plt.tight_layout()
-C.START, C.END = '2014-01-01', '2023-12-31'      # restore the full 10-year period
+C.START, C.END = FULL                            # restore the full period from config.py
 '''),
-("markdown", "## Full 10-year ingest (long: run, close the tab, come back — it resumes)"),
+("markdown", "## Full 2005–2023 ingest (long: run, close the tab, come back — it resumes)"),
 ("code", r'''
+from oceanembed import config as C, ingest
+print('period', C.START, '→', C.END)
 ingest.ingest_inputs(ROOT, days_per_block=31)
 '''),
 ("code", r'''
@@ -120,7 +126,7 @@ prof.to_parquet(f'{ROOT}/argo_2023.parquet'); print(len(prof), 'profiles')
 '''),
 ("markdown", """
 ### Optional — Stage-1 transfer learning data (paper §2.2.2)
-Export **monthly gridded Argo** temperature for 2014–2023 over 45–105°E, 5–30°N from the INCOIS LAS
+Export **monthly gridded Argo** temperature for 2005–2023 over 45–105°E, 5–30°N from the INCOIS LAS
 (the PS's named source) as NetCDF, upload to `MyDrive/OceanEmbed/argo_grid/`, set `VAR` to its variable name.
 """),
 ("code", r'''
