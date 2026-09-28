@@ -29,9 +29,9 @@ sys.path.insert(0, REPO)
 # package at a time, so pip never has to search a large version space (that is what hangs).
 !pip install -q --upgrade-strategy only-if-needed copernicusmarine
 !pip install -q --upgrade-strategy only-if-needed earthaccess
-!pip install -q --upgrade-strategy only-if-needed argopy zarr
+!pip install -q --upgrade-strategy only-if-needed zarr
 import importlib
-for m in ['xarray', 'zarr', 'dask', 'netCDF4', 'ee', 'copernicusmarine', 'earthaccess', 'argopy']:
+for m in ['xarray', 'zarr', 'dask', 'netCDF4', 'ee', 'copernicusmarine', 'earthaccess']:
     print(f'{m:17s}', getattr(importlib.import_module(m), '__version__', 'ok'))
 ''')
 
