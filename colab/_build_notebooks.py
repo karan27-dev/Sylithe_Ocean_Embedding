@@ -25,7 +25,14 @@ if os.path.exists(REPO):
 else:
     !git clone -q https://github.com/karan27-dev/Sylithe_Ocean_Embedding {REPO}
 sys.path.insert(0, REPO)
-!pip -q install copernicusmarine earthaccess argopy "xarray>=2024.6" zarr dask netcdf4 earthengine-api
+# Colab already ships xarray, dask, netCDF4 and earthengine-api. Install only what is missing, one
+# package at a time, so pip never has to search a large version space (that is what hangs).
+!pip install -q --upgrade-strategy only-if-needed copernicusmarine
+!pip install -q --upgrade-strategy only-if-needed earthaccess
+!pip install -q --upgrade-strategy only-if-needed argopy zarr
+import importlib
+for m in ['xarray', 'zarr', 'dask', 'netCDF4', 'ee', 'copernicusmarine', 'earthaccess', 'argopy']:
+    print(f'{m:17s}', getattr(importlib.import_module(m), '__version__', 'ok'))
 ''')
 
 NB1 = [
