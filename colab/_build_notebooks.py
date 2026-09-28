@@ -28,14 +28,18 @@ sys.path.insert(0, REPO)
 for m in [m for m in sys.modules if m.startswith('oceanembed')]:
     del sys.modules[m]                              # re-running this cell picks up freshly pulled code
 !git -C {REPO} log --oneline -1
-# Colab already ships xarray, dask, netCDF4 and earthengine-api. Install only what is missing, one
-# package at a time, so pip never has to search a large version space (that is what hangs).
-!pip install -q --upgrade-strategy only-if-needed copernicusmarine
-!pip install -q --upgrade-strategy only-if-needed earthaccess
-!pip install -q --upgrade-strategy only-if-needed zarr
-import importlib
-for m in ['xarray', 'zarr', 'dask', 'netCDF4', 'ee', 'copernicusmarine', 'earthaccess']:
-    print(f'{m:17s}', getattr(importlib.import_module(m), '__version__', 'ok'))
+# Install only what this Colab image lacks (images differ between sessions), one package at a time, so pip
+# never searches a large version space (that is what hung before).
+import importlib, importlib.util, subprocess
+NEED = {'xarray': 'xarray', 'zarr': 'zarr', 'dask': 'dask', 'netCDF4': 'netCDF4', 'scipy': 'scipy',
+        'ee': 'earthengine-api', 'copernicusmarine': 'copernicusmarine', 'earthaccess': 'earthaccess', 'psutil': 'psutil'}
+for mod, pkg in NEED.items():
+    if importlib.util.find_spec(mod) is None:
+        print('installing', pkg)
+        subprocess.run([sys.executable, '-m', 'pip', 'install', '-q', '--upgrade-strategy', 'only-if-needed', pkg], check=True)
+importlib.invalidate_caches()
+for mod in NEED:
+    print(f'{mod:17s}', getattr(importlib.import_module(mod), '__version__', 'ok'))
 ''')
 
 NB1 = [
