@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react'
 import { MapContainer, TileLayer, ImageOverlay, CircleMarker, Rectangle, useMapEvents } from 'react-leaflet'
 import { renderGrid, gridBounds, cellAt, fmt, rampStops } from '../lib/ocean'
 
+const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas'
+
 const REGIONS = [
   { id: 'BoB', label: 'Bay of Bengal', b: [[5, 80], [23, 100]] },
   { id: 'AS', label: 'Arabian Sea', b: [[5, 50], [25, 78]] },
@@ -27,11 +29,12 @@ export default function OceanMap({ field, grid, layer, range, depth, selected, o
 
   return (
     <div className="relative h-full w-full rounded-2xl overflow-hidden border border-gray-200">
-      <MapContainer center={[17.5, 77]} zoom={5} minZoom={4} maxZoom={9} zoomSnap={0.5}
-        maxBounds={[[-5, 30], [40, 120]]} className="h-full w-full" attributionControl={false}>
-        <TileLayer url="https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png" />
+      <MapContainer bounds={[[5, 45], [30, 105]]} boundsOptions={{ padding: [8, 8] }} minZoom={3} maxZoom={9} zoomSnap={0.25}
+        maxBounds={[[-10, 25], [45, 125]]} className="h-full w-full">
+        <TileLayer url={`${ESRI}/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}`} maxNativeZoom={16}
+          attribution="Basemap © Esri · Data: HYCOM, NOAA OISST via Google Earth Engine" />
         <ImageOverlay url={url} bounds={bounds} className="pixelated" />
-        <TileLayer url="https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png" opacity={0.7} />
+        <TileLayer url={`${ESRI}/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}`} maxNativeZoom={16} opacity={0.8} />
         {showRegions && REGIONS.map((r) => (
           <Rectangle key={r.id} bounds={r.b} pathOptions={{ color: '#0F172A', weight: 1, dashArray: '4 4', fill: false }} />
         ))}
@@ -43,7 +46,7 @@ export default function OceanMap({ field, grid, layer, range, depth, selected, o
       </MapContainer>
 
       {/* hover readout */}
-      <div className="absolute top-3 left-3 z-[500] bg-white/95 backdrop-blur rounded-xl border border-gray-200 px-3 py-2 min-w-[190px] pointer-events-none">
+      <div className="absolute top-3 right-3 z-[500] bg-white/95 backdrop-blur rounded-xl border border-gray-200 px-3 py-2 min-w-[190px] pointer-events-none">
         <p className="eyebrow mb-0.5">{layer.label}{layer.perDepth ? ` · ${depth} m` : ''}</p>
         {hover && hover.v != null ? (
           <p className="font-mono text-[13px] text-ink">
