@@ -29,6 +29,24 @@ export default function App() {
       loadField(d.file).then((f) => setFields((s) => ({ ...s, [d.id]: f }))).catch((e) => setError(e.message)))
   }, [])
 
+  // Deep links: ?layer=tchp&depth=100&date=2024-01-15&probe=88,15 (lon,lat) — shareable demo views
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search)
+    if (q.get('layer')) setLayerId(q.get('layer'))
+    if (q.get('depth')) setDepthIdx(Math.max(0, DEPTHS.indexOf(+q.get('depth'))))
+    if (q.get('date')) setDatasetId(q.get('date'))
+    if (q.get('page')) setPage(q.get('page'))
+    if (q.get('copilot')) setCopilot(true)
+  }, [])
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search).get('probe')
+    const f = fields[datasetId]
+    if (!p || !f || selected) return
+    const [lon, lat] = p.split(',').map(Number)
+    const c = cellAt(f, lat, lon)
+    if (c) setSelected(c)
+  }, [fields, datasetId, selected])
+
   const applyActions = (acts) => {
     setPage('explorer')
     for (const a of acts) {
