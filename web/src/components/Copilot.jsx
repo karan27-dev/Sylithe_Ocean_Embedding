@@ -5,7 +5,7 @@ import { DEPTHS, LAYERS, DATASETS } from '../lib/ocean'
 // Phase 1: a deterministic command parser that drives the console (no LLM, no network).
 // Phase 2 (ARCHITECTURE.md §7): the same actions become Claude tool definitions served by the
 // FastAPI backend, so free-form questions resolve into these exact, auditable calls.
-const HELP = 'Try: "tchp", "depth 150", "jan", "probe 88E 15N", "d26", "section".'
+const HELP = 'Try: "tchp", "depth 150", "jan", "probe 88E 15N", "d26".'
 
 export function parseCommand(text) {
   const t = text.toLowerCase()
