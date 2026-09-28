@@ -1,0 +1,18 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body { @apply bg-paper text-ink font-sans antialiased; }
+
+@layer components {
+  .card { @apply bg-white border border-gray-200 rounded-2xl; }
+  .eyebrow { @apply text-[10px] font-bold text-gray-400 uppercase tracking-widest; }
+  .chip { @apply text-[11px] font-bold px-2.5 py-1 rounded-full; }
+  .seg { @apply px-3 py-1.5 text-[12px] font-semibold rounded-lg transition-colors; }
+  .seg-on { @apply bg-ink text-white; }
+  .seg-off { @apply text-gray-500 hover:text-ink hover:bg-gray-100; }
+}
+
+.leaflet-container { background: #dfe6e3; font-family: 'Space Grotesk', sans-serif; }
+.pixelated { image-rendering: pixelated; }
+input[type=range] { accent-color: #16a34a; }
