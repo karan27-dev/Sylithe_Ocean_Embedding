@@ -103,7 +103,13 @@ def cmems_block(sources: list[C.Source], t0, t1, depth=False) -> xr.DataArray | 
         da = cmems_open(s.dataset_id, s.variable, depth)
         tmin, tmax = pd.Timestamp(da.time.values[0]), pd.Timestamp(da.time.values[-1])
         if tmin <= t0 and tmax >= t1:
-            return (da.sel(time=slice(t0, t1 + pd.Timedelta(hours=23))).load() * s.scale + s.offset)
+            da = da.sel(time=slice(t0, t1 + pd.Timedelta(hours=23)))
+            # load one day at a time and cast to float32 as it arrives: the whole block never exists as float64
+            arr = np.empty(da.shape, dtype=np.float32)
+            for i in range(da.sizes["time"]):
+                arr[i] = da.isel(time=i).values
+            arr *= np.float32(s.scale); arr += np.float32(s.offset)
+            return da.copy(data=arr)
     return None
 
 
@@ -137,7 +143,7 @@ def podaac_block(src: C.Source, t0, t1) -> xr.DataArray | None:
         da = cached.pop(src.variable)
         if not cached:
             del _PODAAC_CACHE[key]                # both components taken: free memory; a retry re-downloads
-    return da * src.scale + src.offset
+    return da * np.float32(src.scale) + np.float32(src.offset)
 
 
 def _podaac_download(dataset_id, t0, t1) -> dict | None:
@@ -156,7 +162,7 @@ def _podaac_download(dataset_id, t0, t1) -> dict | None:
                 for n in names:
                     da = _std_coords(ds[n])
                     parts[n].append(da.sel(lat=slice(C.LAT_MIN - 1, C.LAT_MAX + 1),
-                                           lon=slice(C.LON_MIN - 1, C.LON_MAX + 1)).load())
+                                           lon=slice(C.LON_MIN - 1, C.LON_MAX + 1)).load().astype("f4"))
         out = {}
         for n in names:
             da = _std_time(xr.concat(parts[n], "time")).sortby("time")
@@ -245,6 +251,15 @@ def _ingest_input_block(path, var, t0, t1, M_cache, log):
     return f"ok {var} {t0.date()}–{t1.date()}  ocean-valid={float(np.isfinite(da).mean()):.2f}"
 
 
+def _ram():
+    try:
+        import psutil
+        m = psutil.virtual_memory()
+        return f"  RAM {m.used / 1e9:.1f}/{m.total / 1e9:.1f} GB"
+    except Exception:
+        return ""
+
+
 def _run(tasks, fn, workers, log):
     """Run blocks in parallel threads (the work is network-bound). Each block writes its own time slice
     of the store (chunks are one day), so parallel writes never touch the same chunk."""
@@ -257,11 +272,11 @@ def _run(tasks, fn, workers, log):
             except Exception as e:
                 failures += 1
                 msg = f"!! {futs[f][:3]} crashed: {e!r}"
-            log(f"[{i}/{len(tasks)}] {msg}")
+            log(f"[{i}/{len(tasks)}] {msg}{_ram()}")
     log(f"done: {len(tasks) - failures} ok, {failures} failed (re-run the cell to retry only the failures)")
 
 
-def ingest_inputs(root: str, variables=C.INPUT_VARS, days_per_block=31, workers=6, log=print):
+def ingest_inputs(root: str, variables=C.INPUT_VARS, days_per_block=31, workers=4, log=print):
     path = os.path.join(root, "inputs.zarr")
     init_store(path, C.INPUT_VARS, with_depth=False)
     done, M_cache = _done(path), {}
@@ -285,7 +300,7 @@ def _ingest_glorys_block(path, srcs, t0, t1, M_box, log):
     return f"ok GLORYS {t0.date()}–{t1.date()}"
 
 
-def ingest_glorys(root: str, days_per_block=8, workers=4, log=print):
+def ingest_glorys(root: str, days_per_block=8, workers=2, log=print):
     path = os.path.join(root, "target.zarr")
     init_store(path, ["thetao"], with_depth=True, encode_int16=True)
     srcs = [C.Source("thetao", "cmems", i, C.GLORYS_VAR) for i in C.GLORYS_IDS]
