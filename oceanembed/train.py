@@ -193,5 +193,16 @@ def load_weights(model, ckpt):
     return model
 
 
+def load_model(ckpt):
+    """Rebuild a trained network from its checkpoint alone: architecture and width come from the config saved
+    with it, so evaluation can never pair weights with a differently-sized model. Returns (model, cfg)."""
+    s = torch.load(ckpt, map_location="cpu", weights_only=False)
+    known = set(C.TrainConfig.__dataclass_fields__)
+    cfg = C.TrainConfig(**{k: v for k, v in s["cfg"].items() if k in known})
+    _, model = new_models(cfg)
+    model.load_state_dict(s["model"])
+    return model, cfg
+
+
 def new_models(cfg):
     return SurfaceMAE(base=cfg.base, levels=cfg.levels), build(cfg.arch, cfg)
