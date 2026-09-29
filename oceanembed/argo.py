@@ -47,6 +47,10 @@ def _query(t0: pd.Timestamp, t1: pd.Timestamp, bbox=None, retries=3) -> pd.DataF
 
 
 def _qc(df: pd.DataFrame) -> pd.DataFrame:
+    # QC columns arrive as strings whenever some rows leave them empty (the *_adjusted_qc of real-time
+    # profiles), and "1" is not in {1, 2}: coerce, or every delayed-mode profile is silently dropped.
+    for c in ["position_qc", "pres_adjusted_qc", "temp_adjusted_qc", "pres_qc", "temp_qc"]:
+        df[c] = pd.to_numeric(df[c], errors="coerce")
     adj = df["data_mode"].isin(["A", "D"])
     df = df.assign(
         z=np.where(adj, df["pres_adjusted"], df["pres"]) * 0.99,               # dbar → m (≈1 % here)

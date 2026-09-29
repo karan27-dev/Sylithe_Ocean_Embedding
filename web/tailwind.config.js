@@ -1,22 +1,34 @@
-/** Sylithe design tokens (scraped from ~/Desktop/sylithe/Frontend) applied to OceanEmbed. */
+/** OceanEmbed tokens. The UI stays quiet (paper, ink, one ocean accent) so the data carries the colour.
+ *  Values live as CSS variables in src/index.css; Tailwind only names them. */
+const v = (name) => `rgb(var(--${name}) / <alpha-value>)`
+
 export default {
   content: ['./index.html', './src/**/*.{js,jsx}'],
   theme: {
     extend: {
       colors: {
-        ink: '#0F172A',        // sylitheDark — primary text
-        paper: '#F1F1F1',      // app background
-        abyss: '#08292F',      // deep teal — rail / hero panels
-        trench: '#062125',     // darker teal — rail hover / map frame
-        leaf: '#16a34a',       // primary accent
-        mint: '#a4fca1',       // highlight on dark
-        lime: '#A3E635',       // sylitheGreen
-        mist: '#EBF1ED',       // tinted card
+        paper: v('paper'),     // page
+        wash: v('wash'),       // recessed fill: inputs, hovered rows
+        ink: v('ink'),         // primary text
+        ink2: v('ink2'),       // body text
+        mute: v('mute'),       // secondary text
+        faint: v('faint'),     // tertiary text, ticks
+        line: v('line'),       // hairlines
+        line2: v('line2'),     // stronger hairline, focused controls
+        sea: v('sea'),         // the one UI accent: deep ocean teal
+        seatint: v('seatint'), // accent fill
+        heat: v('heat'),       // alert / threshold (TCHP ≥ 50), used sparingly
+        cold: v('cold'),
       },
       fontFamily: {
-        sans: ['Space Grotesk', 'DM Sans', 'sans-serif'],
-        mono: ['DM Mono', 'monospace'],
+        display: ['Newsreader', 'Georgia', 'serif'],
+        sans: ['Geist', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
+        mono: ['"Geist Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },
+      fontSize: {
+        '2xs': ['10.5px', { lineHeight: '14px', letterSpacing: '0.06em' }],
+      },
+      transitionTimingFunction: { out: 'cubic-bezier(.2,.7,.2,1)' },
     },
   },
   plugins: [],

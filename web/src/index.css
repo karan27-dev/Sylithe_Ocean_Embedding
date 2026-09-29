@@ -2,17 +2,94 @@
 @tailwind components;
 @tailwind utilities;
 
-body { @apply bg-paper text-ink font-sans antialiased; }
-
-@layer components {
-  .card { @apply bg-white border border-gray-200 rounded-2xl; }
-  .eyebrow { @apply text-[10px] font-bold text-gray-400 uppercase tracking-widest; }
-  .chip { @apply text-[11px] font-bold px-2.5 py-1 rounded-full; }
-  .seg { @apply px-3 py-1.5 text-[12px] font-semibold rounded-lg transition-colors; }
-  .seg-on { @apply bg-ink text-white; }
-  .seg-off { @apply text-gray-500 hover:text-ink hover:bg-gray-100; }
+:root {
+  --paper: 245 243 238;   /* #F5F3EE */
+  --wash: 236 233 226;    /* #ECE9E2 */
+  --ink: 21 24 26;        /* #15181A */
+  --ink2: 58 63 66;       /* #3A3F42 */
+  --mute: 110 116 119;    /* #6E7477 */
+  --faint: 150 154 154;   /* #969A9A */
+  --line: 222 218 210;    /* #DEDAD2 */
+  --line2: 200 195 186;   /* #C8C3BA */
+  --sea: 15 76 74;        /* #0F4C4A */
+  --seatint: 225 234 230; /* #E1EAE6 */
+  --heat: 180 83 42;      /* #B4532A */
+  --cold: 44 92 138;      /* #2C5C8A */
+  --bar: 52px;
+  color-scheme: light;
 }
 
-.leaflet-container { background: #dfe6e3; font-family: 'Space Grotesk', sans-serif; }
-.pixelated { image-rendering: pixelated; }
-input[type=range] { accent-color: #16a34a; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  @apply bg-paper text-ink font-sans antialiased;
+  font-size: 14px;
+  line-height: 1.55;
+  font-feature-settings: 'ss01', 'cv11';
+}
+::selection { background: rgb(var(--sea) / 0.16); }
+:focus-visible { outline: 2px solid rgb(var(--sea)); outline-offset: 2px; border-radius: 3px; }
+button { -webkit-tap-highlight-color: transparent; }
+
+@layer components {
+  /* Instrument label: small, mono, spaced. Used for axis titles, field names, section markers. */
+  .label { @apply font-mono text-2xs uppercase text-faint; letter-spacing: 0.08em; }
+  .num { @apply font-mono; font-variant-numeric: tabular-nums; }
+  .display { @apply font-display text-ink; font-weight: 400; letter-spacing: -0.012em; }
+  .hair { @apply border-line; }
+  .link { @apply text-sea underline decoration-sea/30 underline-offset-[3px] hover:decoration-sea transition-colors; }
+
+  /* Text tabs: no pills, just weight and an underline that slides. */
+  .tab { @apply relative py-1.5 text-[13px] text-mute transition-colors duration-150 hover:text-ink whitespace-nowrap; }
+  .tab[aria-selected='true'] { @apply text-ink; }
+  .tab[aria-selected='true']::after {
+    content: ''; @apply absolute left-0 right-0 -bottom-px h-px bg-ink;
+  }
+
+  /* Quiet segmented control for 2–4 options */
+  .seg { @apply inline-flex items-center rounded-[7px] border border-line bg-paper p-0.5; }
+  .seg > button { @apply px-2.5 h-7 rounded-[5px] text-[12.5px] text-mute transition-colors duration-150 hover:text-ink; }
+  .seg > button[aria-pressed='true'] { @apply bg-ink text-paper; }
+
+  .btn { @apply inline-flex items-center gap-2 h-8 px-3 rounded-[7px] border border-line text-[13px] text-ink2 transition-colors duration-150 hover:border-line2 hover:text-ink; }
+  .btn-solid { @apply inline-flex items-center gap-2 h-9 px-4 rounded-[7px] bg-ink text-paper text-[13px] transition-colors duration-150 hover:bg-sea; }
+
+  /* Floating map instrument panel: flat, hairline, a whisper of blur for legibility over data. */
+  .instrument { @apply bg-paper/[0.93] border border-line rounded-[10px]; backdrop-filter: blur(6px); }
+
+  .page { @apply mx-auto w-full max-w-[1240px] px-4 sm:px-8 lg:px-12; }
+  .rule { @apply border-t border-line; }
+}
+
+/* ---------------------------------------------------------------- range input (depth, time) */
+input[type='range'].slider { -webkit-appearance: none; appearance: none; background: transparent; height: 22px; cursor: pointer; }
+input[type='range'].slider::-webkit-slider-runnable-track { height: 1px; background: rgb(var(--line2)); }
+input[type='range'].slider::-moz-range-track { height: 1px; background: rgb(var(--line2)); }
+input[type='range'].slider::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 13px; height: 13px; margin-top: -6px; border-radius: 50%;
+  background: rgb(var(--paper)); border: 1.5px solid rgb(var(--ink)); transition: transform .15s;
+}
+input[type='range'].slider::-moz-range-thumb { width: 11px; height: 11px; border-radius: 50%; background: rgb(var(--paper)); border: 1.5px solid rgb(var(--ink)); }
+input[type='range'].slider:active::-webkit-slider-thumb { transform: scale(1.2); }
+
+/* ---------------------------------------------------------------- leaflet */
+.leaflet-container { background: #E9E7E1; font-family: Geist, system-ui, sans-serif; }
+.leaflet-control-attribution { background: rgb(var(--paper) / .8) !important; color: rgb(var(--faint)) !important; font-size: 10px !important; }
+.leaflet-control-attribution a { color: rgb(var(--mute)) !important; }
+.leaflet-control-zoom { border: 1px solid rgb(var(--line)) !important; border-radius: 8px !important; overflow: hidden; }
+.leaflet-control-zoom a { background: rgb(var(--paper)) !important; color: rgb(var(--ink2)) !important; border-color: rgb(var(--line)) !important; width: 30px !important; height: 30px !important; line-height: 30px !important; }
+.leaflet-tile-pane { filter: saturate(0.6) sepia(0.08); }
+.leaflet-image-layer.data { image-rendering: pixelated; transition: opacity .25s ease; }
+
+/* ---------------------------------------------------------------- motion (state, not decoration) */
+.fade-in { animation: fade .28s cubic-bezier(.2,.7,.2,1) both; }
+.rise-in { animation: rise .32s cubic-bezier(.2,.7,.2,1) both; }
+@keyframes fade { from { opacity: 0 } to { opacity: 1 } }
+@keyframes rise { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: none } }
+.draw path.trace { stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw .6s cubic-bezier(.2,.7,.2,1) forwards; }
+@keyframes draw { to { stroke-dashoffset: 0 } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }

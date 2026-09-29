@@ -1,106 +1,63 @@
-import { useEffect, useState } from 'react'
-import { Map, Database, Brain, FlaskConical, Sparkles, Waves } from 'lucide-react'
+import { createContext, useContext, useEffect } from 'react'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import Shell from './components/Shell'
+import Copilot from './components/Copilot'
+import Overview from './pages/Overview'
 import Explorer from './pages/Explorer'
+import Embedding from './pages/Embedding'
+import Validation from './pages/Validation'
+import Cyclone from './pages/Cyclone'
 import Pipeline from './pages/Pipeline'
 import Model from './pages/Model'
-import Validation from './pages/Validation'
-import Copilot from './components/Copilot'
-import { DATASETS, DEPTHS, loadField, cellAt } from './lib/ocean'
+import Downloads from './pages/Downloads'
+import { useManifest } from './lib/data'
+import { useView } from './lib/store'
 
-const NAV = [
-  { id: 'explorer', label: 'Explorer', icon: Map },
-  { id: 'validation', label: 'Validation', icon: FlaskConical },
-  { id: 'pipeline', label: 'Pipeline', icon: Database },
-  { id: 'model', label: 'Model', icon: Brain },
+const DataCtx = createContext(null)
+/** { m: manifest | null, error } — every page reads the export through this. */
+export const useData = () => useContext(DataCtx)
+
+export const NAV = [
+  { to: '/explorer', label: 'Explorer' },
+  { to: '/embedding', label: 'Embedding' },
+  { to: '/validation', label: 'Validation' },
+  { to: '/cyclone', label: 'Cyclone watch' },
+  { to: '/pipeline', label: 'Pipeline' },
+  { to: '/model', label: 'Model' },
+  { to: '/data', label: 'Data' },
 ]
 
 export default function App() {
-  const [page, setPage] = useState('explorer')
-  const [fields, setFields] = useState({})
-  const [error, setError] = useState(null)
-  const [datasetId, setDatasetId] = useState(DATASETS[0].id)
-  const [layerId, setLayerId] = useState('temp')
-  const [depthIdx, setDepthIdx] = useState(DEPTHS.indexOf(100))
-  const [selected, setSelected] = useState(null)
-  const [copilot, setCopilot] = useState(false)
+  const data = useManifest()
+  const { pathname } = useLocation()
+  const { date, set } = useView()
 
+  // Default to the export's most recent day; keep a deep-linked date only if the export has it.
   useEffect(() => {
-    DATASETS.forEach((d) =>
-      loadField(d.file).then((f) => setFields((s) => ({ ...s, [d.id]: f }))).catch((e) => setError(e.message)))
-  }, [])
+    const m = data.m
+    if (m && (!date || !(date in m.dayIndex))) set({ date: m.days[m.days.length - 1].date })
+  }, [data.m, date, set])
 
-  // Deep links: ?layer=tchp&depth=100&date=2024-01-15&probe=88,15 (lon,lat) — shareable demo views
-  useEffect(() => {
-    const q = new URLSearchParams(window.location.search)
-    if (q.get('layer')) setLayerId(q.get('layer'))
-    if (q.get('depth')) setDepthIdx(Math.max(0, DEPTHS.indexOf(+q.get('depth'))))
-    if (q.get('date')) setDatasetId(q.get('date'))
-    if (q.get('page')) setPage(q.get('page'))
-    if (q.get('copilot')) setCopilot(true)
-  }, [])
-  useEffect(() => {
-    const p = new URLSearchParams(window.location.search).get('probe')
-    const f = fields[datasetId]
-    if (!p || !f || selected) return
-    const [lon, lat] = p.split(',').map(Number)
-    const c = cellAt(f, lat, lon)
-    if (c) setSelected(c)
-  }, [fields, datasetId, selected])
-
-  const applyActions = (acts) => {
-    setPage('explorer')
-    for (const a of acts) {
-      if (a.type === 'layer') setLayerId(a.id)
-      if (a.type === 'depth') setDepthIdx(a.idx)
-      if (a.type === 'date') setDatasetId(a.id)
-      if (a.type === 'probe') {
-        const f = fields[datasetId]
-        const c = f && cellAt(f, a.lat, a.lon)
-        if (c && f.temp[0][c.y][c.x] != null) setSelected(c)
-      }
-    }
-  }
+  useEffect(() => { if (pathname !== '/explorer') window.scrollTo(0, 0) }, [pathname])
 
   return (
-    <div className="flex min-h-screen">
-      <nav className="w-[220px] shrink-0 bg-abyss text-white flex flex-col h-screen sticky top-0">
-        <div className="px-5 py-6 flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-mint/15 grid place-items-center"><Waves size={18} className="text-mint" /></div>
-          <div>
-            <p className="font-bold leading-none">OceanEmbed</p>
-            <p className="text-[10px] text-mint/70 mt-1 tracking-wider">SIH 26066 · INCOIS</p>
-          </div>
+    <DataCtx.Provider value={data}>
+      <Shell>
+        <div key={pathname} className="fade-in">
+          <Routes>
+            <Route path="/" element={<Overview />} />
+            <Route path="/explorer" element={<Explorer />} />
+            <Route path="/embedding" element={<Embedding />} />
+            <Route path="/validation" element={<Validation />} />
+            <Route path="/cyclone" element={<Cyclone />} />
+            <Route path="/pipeline" element={<Pipeline />} />
+            <Route path="/model" element={<Model />} />
+            <Route path="/data" element={<Downloads />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
         </div>
-        <div className="px-3 space-y-1">
-          {NAV.map(({ id, label, icon: Icon }) => (
-            <button key={id} onClick={() => setPage(id)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-colors ${
-                page === id ? 'bg-white/10 text-white' : 'text-white/60 hover:text-white hover:bg-trench'}`}>
-              <Icon size={17} className={page === id ? 'text-mint' : ''} />{label}
-            </button>
-          ))}
-        </div>
-        <div className="mt-auto p-3">
-          <button onClick={() => setCopilot((o) => !o)}
-            className="w-full flex items-center justify-center gap-2 rounded-xl bg-mint text-abyss font-bold text-[13px] py-2.5 hover:bg-lime transition-colors">
-            <Sparkles size={15} /> Ocean Copilot
-          </button>
-          <p className="text-[10px] text-white/40 mt-3 px-1 leading-snug">Surface satellites → 15-level temperature, 0–1000 m. North Indian Ocean.</p>
-        </div>
-      </nav>
-
-      <main className="flex-1 min-w-0">
-        {error && <div className="m-6 card p-4 text-[13px] text-red-600">Could not load data: {error}</div>}
-        {page === 'explorer' && (
-          <Explorer fields={fields} datasetId={datasetId} setDatasetId={setDatasetId} layerId={layerId} setLayerId={setLayerId}
-            depthIdx={depthIdx} setDepthIdx={setDepthIdx} selected={selected} setSelected={setSelected} />
-        )}
-        {page === 'validation' && <Validation />}
-        {page === 'pipeline' && <Pipeline />}
-        {page === 'model' && <Model />}
-      </main>
-
-      <Copilot open={copilot} onClose={() => setCopilot(false)} onActions={applyActions} />
-    </div>
+      </Shell>
+      <Copilot />
+    </DataCtx.Provider>
   )
 }

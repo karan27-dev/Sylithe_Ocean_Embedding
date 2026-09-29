@@ -1,0 +1,114 @@
+{
+ "version": 2,
+ "source": {
+  "kind": "reference",
+  "label": "HYCOM GOFS 3.1 daily mean",
+  "detail": "Independent ocean model via Google Earth Engine, with NOAA OISST v2.1 as the surface input. Shown until the OceanEmbed reconstruction is exported by notebook 03."
+ },
+ "grid": {
+  "lon0": 45.0,
+  "lat0": 30.0,
+  "step": 0.25,
+  "width": 241,
+  "height": 101
+ },
+ "depths": [
+  0,
+  5,
+  10,
+  20,
+  30,
+  50,
+  75,
+  100,
+  125,
+  150,
+  200,
+  300,
+  500,
+  700,
+  1000
+ ],
+ "regions": {
+  "NIO": {
+   "lat": [
+    5,
+    30
+   ],
+   "lon": [
+    45,
+    105
+   ]
+  },
+  "BoB": {
+   "lat": [
+    5,
+    23
+   ],
+   "lon": [
+    80,
+    100
+   ]
+  },
+  "AS": {
+   "lat": [
+    5,
+    25
+   ],
+   "lon": [
+    50,
+    78
+   ]
+  }
+ },
+ "days": [
+  {
+   "date": "2024-01-15",
+   "layers": [
+    "temp",
+    "sst"
+   ],
+   "note": "Northeast monsoon · Bay of Bengal barrier layer"
+  },
+  {
+   "date": "2024-05-15",
+   "layers": [
+    "temp",
+    "sst"
+   ],
+   "note": "Pre-monsoon · peak cyclone-season heat"
+  }
+ ],
+ "layers": {
+  "temp": {
+   "scale": 0.001,
+   "offset": 20.0,
+   "unit": "°C",
+   "label": "Temperature",
+   "levels": 15
+  },
+  "sst": {
+   "scale": 0.001,
+   "offset": 20.0,
+   "unit": "°C",
+   "label": "Sea surface temperature",
+   "levels": 1
+  }
+ },
+ "files": {
+  "argo": "argo.json",
+  "skill_depth": "skill_depth.json"
+ },
+ "nodata": -32768,
+ "products": {
+  "hycom": {
+   "label": "HYCOM GOFS 3.1",
+   "kind": "reference"
+  }
+ },
+ "inputs": [
+  "sst"
+ ],
+ "primary": "hycom",
+ "argo_match": "profiles within ±3 days of the field day, nearest 0.25° cell"
+}
