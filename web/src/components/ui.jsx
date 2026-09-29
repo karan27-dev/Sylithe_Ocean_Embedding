@@ -60,8 +60,8 @@ export function Footer() {
   return (
     <footer className="mt-24 border-t border-line">
       <div className="page flex flex-col gap-3 py-8 text-[12px] text-mute sm:flex-row sm:items-center sm:justify-between">
-        <p>OceanEmbed · Smart India Hackathon 2026 · PS 26066 · MoES / INCOIS</p>
-        <p>Colour maps: cmocean (Thyng et al., 2016). Basemap © CARTO, © OpenStreetMap contributors.</p>
+        <p>OceanEmbed · Reconstructing the ocean beneath the surface.</p>
+        <p>Colour maps: cmocean (Thyng et al., 2016). Basemap © Esri.</p>
       </div>
     </footer>
   )

@@ -6,6 +6,10 @@ console works on genuine data and nothing is invented. Notebook 03 overwrites th
 
     PYTHONUTF8=1 python web/scripts/build_demo_data.py          (from the repo root; needs numpy + pandas)
 
+The GEE export was sampled coarsely and carries values onto land (Sri Lanka, the Malay peninsula), so
+every field is masked with a 0.25° land mask from Natural Earth 1:50m land polygons (cell centres; built once
+into web/data-src/land_mask_0p25.npy, north→south rows).
+
 Argo floats surface every 5–10 days, so profiles within ±WINDOW days of each field day are matched to that
 day's field. The manifest records this; the model export matches same-day only.
 """
@@ -14,6 +18,7 @@ import json
 import os
 import shutil
 import sys
+import urllib.request
 
 import numpy as np
 import pandas as pd
@@ -27,6 +32,34 @@ OUT = os.path.join(ROOT, "web", "public", "data")
 WINDOW = 3
 NOTES = {"2024-01-15": "Northeast monsoon · Bay of Bengal barrier layer",
          "2024-05-15": "Pre-monsoon · peak cyclone-season heat"}
+
+
+NE_LAND = "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_land.geojson"
+MASK = os.path.join(SRC, "land_mask_0p25.npy")
+
+
+def land_mask() -> np.ndarray:
+    """(H, W) bool, north→south rows, True where the cell centre is on land."""
+    if os.path.exists(MASK):
+        return np.load(MASK)
+    from matplotlib.path import Path
+    geo = json.load(urllib.request.urlopen(NE_LAND, timeout=120))
+    lats = C.LAT_MAX - np.arange(len(C.LATS)) * C.RES
+    lon2, lat2 = np.meshgrid(C.LONS, lats)
+    pts = np.column_stack([lon2.ravel(), lat2.ravel()])
+    land = np.zeros(len(pts), bool)
+    for feat in geo["features"]:
+        g = feat["geometry"]
+        polys = g["coordinates"] if g["type"] == "MultiPolygon" else [g["coordinates"]]
+        for poly in polys:
+            ring = np.asarray(poly[0])
+            if ring[:, 0].max() < C.LON_MIN - 1 or ring[:, 0].min() > C.LON_MAX + 1 or                ring[:, 1].max() < C.LAT_MIN - 1 or ring[:, 1].min() > C.LAT_MAX + 1:
+                continue
+            inside = Path(ring).contains_points(pts)
+            land |= inside
+    mask = land.reshape(lon2.shape)
+    np.save(MASK, mask)
+    return mask
 
 
 class Field:
@@ -63,12 +96,15 @@ def main():
     ex = W.WebExport(OUT, "reference", "HYCOM GOFS 3.1 daily mean",
                      "Independent ocean model via Google Earth Engine, with NOAA OISST v2.1 as the surface input. "
                      "Shown until the OceanEmbed reconstruction is exported by notebook 03.")
+    land = land_mask()
     days, cubes = [], []
     for path in sorted(glob.glob(os.path.join(SRC, "hycom_*.json"))):
         f = json.load(open(path, encoding="utf-8"))
         temp = np.stack([to_array(l) for l in f["temp"]])        # north→south
+        temp[:, land] = np.nan
+        sst = to_array(f["sst"]); sst[land] = np.nan
         ex.add(f["date"], "temp", temp, north_up=True, note=NOTES.get(f["date"]))
-        ex.add(f["date"], "sst", to_array(f["sst"]), north_up=True)
+        ex.add(f["date"], "sst", sst, north_up=True)
         days.append(f["date"]); cubes.append(temp[:, ::-1])       # south→north for argo.match
         print(f["date"], "field written")
 

@@ -77,8 +77,10 @@ input[type='range'].slider:active::-webkit-slider-thumb { transform: scale(1.2);
 .leaflet-control-attribution a { color: rgb(var(--mute)) !important; }
 .leaflet-control-zoom { border: 1px solid rgb(var(--line)) !important; border-radius: 8px !important; overflow: hidden; }
 .leaflet-control-zoom a { background: rgb(var(--paper)) !important; color: rgb(var(--ink2)) !important; border-color: rgb(var(--line)) !important; width: 30px !important; height: 30px !important; line-height: 30px !important; }
-.leaflet-tile-pane { filter: saturate(0.6) sepia(0.08); }
-.leaflet-image-layer.data { image-rendering: pixelated; transition: opacity .25s ease; }
+@media (max-width: 1023px) { .leaflet-control-zoom { display: none; } }
+.leaflet-tile-pane { filter: saturate(0.5) sepia(0.1) brightness(1.02); }
+.leaflet-image-layer.data { transition: opacity .3s ease; }
+.leaflet-image-layer.data.cells { image-rendering: pixelated; }
 
 /* ---------------------------------------------------------------- motion (state, not decoration) */
 .fade-in { animation: fade .28s cubic-bezier(.2,.7,.2,1) both; }
