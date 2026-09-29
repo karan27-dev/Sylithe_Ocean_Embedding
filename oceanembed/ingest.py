@@ -129,6 +129,10 @@ def _std_time(da: xr.DataArray) -> xr.DataArray:
 _PODAAC_CACHE: dict = {}
 _PODAAC_LOCKS: dict = {}
 _PODAAC_GUARD = threading.Lock()
+# The netCDF4/HDF5 C library is not thread-safe: two threads parsing files at once can kill the Python
+# process with no traceback ("session crashed for an unknown reason" at 2 GB RAM). Downloads stay
+# parallel; only the few seconds of file parsing per block are serialised.
+_NETCDF_LOCK = threading.Lock()
 
 
 def podaac_block(src: C.Source, t0, t1) -> xr.DataArray | None:
@@ -161,12 +165,13 @@ def _podaac_download(dataset_id, t0, t1) -> dict | None:
     try:
         files = earthaccess.download(res, tmp)
         parts = {n: [] for n in names}
-        for f in sorted(files):
-            with xr.open_dataset(f) as ds:
-                for n in names:
-                    da = _std_coords(ds[n])
-                    parts[n].append(da.sel(lat=slice(C.LAT_MIN - 1, C.LAT_MAX + 1),
-                                           lon=slice(C.LON_MIN - 1, C.LON_MAX + 1)).load().astype("f4"))
+        with _NETCDF_LOCK:
+            for f in sorted(files):
+                with xr.open_dataset(f) as ds:
+                    for n in names:
+                        da = _std_coords(ds[n])
+                        parts[n].append(da.sel(lat=slice(C.LAT_MIN - 1, C.LAT_MAX + 1),
+                                               lon=slice(C.LON_MIN - 1, C.LON_MAX + 1)).load().astype("f4"))
         out = {}
         for n in names:
             da = _std_time(xr.concat(parts[n], "time")).sortby("time")
