@@ -151,6 +151,8 @@ else: print('no gridded Argo files yet: stage 1 will be skipped')
 '''),
 ("code", r'''
 # ── QA: coverage per variable (fraction of ocean pixel-days that are valid) ──
+import xarray as xr
+from oceanembed import config as C
 ds = xr.open_zarr(f'{ROOT}/inputs.zarr'); T = xr.open_zarr(f'{ROOT}/target.zarr').thetao
 ocean = T.isel(time=0, depth=0).notnull()
 for v in C.INPUT_VARS:
