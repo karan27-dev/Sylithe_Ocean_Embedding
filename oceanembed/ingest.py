@@ -20,7 +20,7 @@ import pandas as pd
 import xarray as xr
 
 from . import config as C
-from .regrid import bin_matrix, daily_mean, to_std_depths, to_target_grid, _std_coords
+from .regrid import bin_average, bin_matrix, daily_mean, to_std_depths, to_target_grid, _std_coords
 
 T_ENCODING = {"dtype": "int16", "scale_factor": 0.001, "add_offset": 20.0, "_FillValue": -32768}
 
@@ -60,13 +60,21 @@ def _mark(path, key):
         os.replace(tmp, path + ".done.json")      # atomic: a disconnect never leaves a half-written file
 
 
+def forget(path: str, prefixes: list[str]):
+    """Drop progress entries (e.g. ["uc:", "vc:"]) so the next ingest run re-fetches those blocks."""
+    with _MARK_LOCK:
+        s = {k for k in _done(path) if not any(k.startswith(p) for p in prefixes)}
+        json.dump(sorted(s), open(path + ".done.json", "w"))
+    return len(s)
+
+
 def write_block(path: str, da: xr.DataArray, name: str):
     """Region-write a block whose time axis is a contiguous slice of the store's axis."""
     store_time = xr.open_zarr(path).time.values
     i0 = int(np.searchsorted(store_time, da.time.values[0]))
     i1 = i0 + da.sizes["time"]
     order = ["time", "depth", "lat", "lon"] if "depth" in da.dims else ["time", "lat", "lon"]
-    ds = da.transpose(*order).astype("f4").to_dataset(name=name)
+    ds = da.transpose(*order).astype("f4", copy=False).to_dataset(name=name)
     ds = ds.drop_vars([c for c in ds.coords])   # region writes must not rewrite coordinates
     ds.to_zarr(path, region={d: (slice(i0, i1) if d == "time" else slice(None)) for d in order})
 
@@ -84,14 +92,14 @@ def blocks(start, end, days):
 _CMEMS_CACHE: dict = {}
 
 
-def cmems_open(dataset_id: str, variable: str, depth: bool = False) -> xr.DataArray:
+def cmems_open(dataset_id: str, variable: str, depth: bool = False, service: str = "arco-geo-series") -> xr.DataArray:
     import copernicusmarine as cm
-    key = (dataset_id, variable)
+    key = (dataset_id, variable, service)
     if key not in _CMEMS_CACHE:
         # Force the map-optimised layout (chunks = 1 day × ~1000² cells). Over a 30-year span the client can
         # otherwise pick "arco-time-series" (chunks = ~3000 days × 16² cells), and then every month we read
         # drags in ~8 years of data per tile: that was the slowness and the RAM growth in the first full run.
-        kw = dict(dataset_id=dataset_id, variables=[variable], service="arco-geo-series", **C.BBOX)
+        kw = dict(dataset_id=dataset_id, variables=[variable], service=service, **C.BBOX)
         if depth:
             kw.update(minimum_depth=0, maximum_depth=C.GLORYS_MAX_DEPTH)
         _CMEMS_CACHE[key] = _std_coords(cm.open_dataset(**kw)[variable])   # lazy ARCO/Zarr, nothing downloaded yet
@@ -357,3 +365,104 @@ def ingest_gridded_argo(root: str, nc_paths: list[str], variable: str, log=print
     da.sel(time=common).transpose("time", "depth", "lat", "lon").astype("f4").to_dataset(name="thetao") \
       .chunk({"time": 1}).to_zarr(os.path.join(root, "argo_monthly.zarr"), mode="w")
     log(f"gridded Argo: {len(common)} months aligned")
+
+
+# ------------------------------------------------------------------ fast target reader (time-series layout)
+def _ts_time_chunk(dataset_id: str, variable: str) -> int:
+    """Length (days) of one storage chunk along time in the arco-time-series layout (GLORYS12: 2081)."""
+    import copernicusmarine as cm
+    part = cm.describe(dataset_id=dataset_id, disable_progress_bar=True).products[0].datasets[0].versions[-1].parts[0]
+    for s in part.services:
+        if s.service_name == "arco-time-series":
+            v = [x for x in s.variables if x.short_name == variable][0]
+            return int([c for c in v.coordinates if c.coordinate_id == "time"][0].chunking_length)
+    return 365
+
+
+def depth_plan(src: np.ndarray):
+    """For each PS standard depth: (k0, k1, w) so T = (1-w)·level[k0] + w·level[k1]; None below the deepest level.
+    Same arithmetic as regrid.to_std_depths (0 m takes the shallowest level)."""
+    plan = []
+    for z in np.clip(np.array(C.DEPTHS, dtype=float), src[0], None):
+        if z > src[-1]:
+            plan.append(None); continue
+        k = int(np.clip(np.searchsorted(src, z), 1, len(src) - 1))
+        plan.append((k - 1, k, float((z - src[k - 1]) / (src[k] - src[k - 1]))))
+    return plan
+
+
+def _level_to_grid(level: xr.DataArray, M) -> np.ndarray:
+    """(time, lat, lon) source level → (time, 101, 241) float32 on the target grid (NaN outside this band)."""
+    a = np.empty(level.shape, dtype=np.float32)
+    step = 256
+    for i in range(0, level.sizes["time"], step):            # cast to float32 as slices arrive
+        a[i:i + step] = level.isel(time=slice(i, i + step)).values
+    lv = level.copy(data=a)
+    if M is not None:
+        return bin_average(lv, M).values
+    # native 0.25° (GLORYS2V4): same cell centres as ours, so select exactly instead of interpolating
+    return lv.reindex(lat=C.LATS, lon=C.LONS, method="nearest", tolerance=1e-3).values
+
+
+def ingest_target(root: str, product: str | None = None, band_rows: int = 32, dask_threads: int = 16,
+                  write_days: int = 128, log=print):
+    """Target reanalysis → target.zarr via the arco-time-series layout.
+
+    The map layout stores 1 day × 1 depth × ~43°×170° per chunk, so each day of our box drags in ~10× its size
+    over ~37 levels (2 blocks per 6 min ≈ 40 h for 2005–2023). Here chunks are ~16×16 cells × ~2000 days, so
+    we read one storage time-window at a time, level by level, in latitude bands, and only the levels that
+    bracket the 15 standard depths. Each window is written once. Resumable per window."""
+    import dask
+    product = product or C.TARGET_PRODUCT
+    did, var = C.TARGETS[product]
+    path = os.path.join(root, "target.zarr")
+    init_store(path, ["thetao"], with_depth=True, encode_int16=True)
+    da = cmems_open(did, var, depth=True, service="arco-time-series")
+    src_z = da.depth.values.astype(float)
+    plan = depth_plan(src_z)
+    tlen = _ts_time_chunk(did, var)
+    t_all = pd.DatetimeIndex(da.time.values).normalize()
+    i_start = int(t_all.searchsorted(pd.Timestamp(C.START)))
+    i_end = int(t_all.searchsorted(pd.Timestamp(C.END), side="right"))
+    if i_start >= i_end or t_all[i_start] != pd.Timestamp(C.START) or t_all[i_end - 1] != pd.Timestamp(C.END):
+        raise ValueError(f"{did} does not cover {C.START} → {C.END} (has {t_all[0].date()} → {t_all[-1].date()})")
+    edges = sorted({i_start, i_end} | {k * tlen for k in range(i_start // tlen + 1, (i_end - 1) // tlen + 1)})
+    windows = list(zip(edges[:-1], edges[1:]))
+    fine = float(np.abs(np.diff(da.lat.values)).mean()) < C.RES * 0.8
+    bands = [(r, min(r + band_rows, len(C.LATS))) for r in range(0, len(C.LATS), band_rows)]
+    done = _done(path)
+    log(f"target {product} ({did}): {len(windows)} time windows of ≤{tlen} days × {len(bands)} lat bands, "
+        f"{len({k for p in plan if p for k in p[:2]})} source levels")
+    with dask.config.set(scheduler="threads", num_workers=dask_threads):   # many small HTTP reads: IO-bound
+        for i0, i1 in windows:
+            key = f"{product}:{t_all[i0].date()}"
+            if key in done:
+                continue
+            out = np.full((i1 - i0, len(C.DEPTHS), len(C.LATS), len(C.LONS)), np.nan, dtype=np.float32)
+            for r0, r1 in bands:
+                lo, hi = C.LATS[r0] - C.RES / 2, C.LATS[r1 - 1] + C.RES / 2
+                sub = da.isel(time=slice(i0, i1)).sel(lat=slice(lo, hi))
+                M = bin_matrix(sub.lat.values, sub.lon.values) if fine else None
+                cache = {}
+                for ti, p in enumerate(plan):
+                    if p is None:
+                        continue
+                    k0, k1, w = p
+                    for k in (k0, k1):
+                        if k not in cache:
+                            cache[k] = _level_to_grid(sub.isel(depth=k), M)
+                    for k in [k for k in cache if k < k0]:
+                        del cache[k]                                  # keep at most the two levels in use
+                    out[:, ti, r0:r1] = (cache[k0][:, r0:r1] * np.float32(1 - w) + cache[k1][:, r0:r1] * np.float32(w))
+                del cache
+                log(f"  {t_all[i0].date()}–{t_all[i1 - 1].date()}  lat band {C.LATS[r0]:.2f}–{C.LATS[r1 - 1]:.2f}°N done{_ram()}")
+            times = t_all[i0:i1]
+            for j in range(0, i1 - i0, write_days):                  # small writes: int16 encoding upcasts in memory
+                blk = xr.DataArray(out[j:j + write_days], dims=["time", "depth", "lat", "lon"],
+                                   coords={"time": times[j:j + write_days], "depth": np.array(C.DEPTHS, float),
+                                           "lat": C.LATS, "lon": C.LONS})
+                write_block(path, blk, "thetao")
+            del out
+            _mark(path, key)
+            log(f"ok target window {t_all[i0].date()}–{t_all[i1 - 1].date()}{_ram()}")
+    log("target done")

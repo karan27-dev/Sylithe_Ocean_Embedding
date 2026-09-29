@@ -76,6 +76,16 @@ SOURCES = {
 # covering the whole 2005–2023 period; the old "myint" continuation ID no longer exists.
 GLORYS_IDS = ["cmems_mod_glo_phy_my_0.083deg_P1D-m"]
 GLORYS_VAR = "thetao"
+
+# Which reanalysis is the training target. Both are read with the fast time-series reader (ingest_target):
+#   "glorys12"  = GLORYS12V1 1/12° (moi-00021), the product the PS names; averaged down to 0.25°
+#   "glorys2v4" = GLORYS2V4 0.25° (moi-00024, member of the multi-reanalysis product), the target used by
+#                 Wang et al. (ESSD 2026); already on our grid, ~6× less to download
+TARGET_PRODUCT = "glorys12"
+TARGETS = {
+    "glorys12": ("cmems_mod_glo_phy_my_0.083deg_P1D-m", "thetao"),
+    "glorys2v4": ("cmems_mod_glo_phy-all_my_0.25deg_P1D-m", "thetao_glor"),
+}
 GLORYS_MAX_DEPTH = 1300   # one level below 1000 m so vertical interpolation is not an extrapolation
 
 # Independent comparator available in GEE (never used as a training target)
