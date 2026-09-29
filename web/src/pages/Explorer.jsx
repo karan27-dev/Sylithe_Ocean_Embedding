@@ -46,33 +46,27 @@ export default function Explorer() {
       </aside>
 
       <div className="relative flex min-w-0 flex-1 flex-col">
+        {/* title strip: docked above the map, never on top of the data */}
+        <div className="flex items-center gap-6 border-b border-line bg-paper px-4 py-2.5 sm:px-5">
+          <div className="min-w-0">
+            <p className="label truncate">{REGIONS[v.region].label} · {day ? fmtDate(day.date) : '—'}
+              {m.source.kind !== 'model' && <span title={m.source.detail}> · {m.source.label}, reference field</span>}</p>
+            <h1 key={`${layer.id}${v.depth}`} className="display fade-in mt-0.5 truncate text-[20px] leading-tight sm:text-[22px]">
+              {title}<span className="ml-3 hidden font-sans text-[12.5px] tracking-normal text-mute xl:inline">{layer.help}</span>
+            </h1>
+          </div>
+          <div className="ml-auto hidden shrink-0 items-center gap-4 md:flex" role="group" aria-label="Region">
+            {Object.entries(REGIONS).map(([k, r]) => (
+              <button key={k} onClick={() => v.set({ region: k })} aria-selected={v.region === k} className="tab">{r.label}</button>
+            ))}
+          </div>
+        </div>
+
         <div className="relative min-h-0 flex-1">
           <OceanMap g={m.grid} url={url} grid={grid} probe={probeCell} onPick={pick} onHover={setHover} region={v.region}
-            padding={[40, 40]} />
+            padding={[16, 16]} />
 
-          {/* title plate */}
-          <div className="pointer-events-none absolute left-3 top-3 z-[500] max-w-[min(360px,calc(100%-24px))] sm:left-5 sm:top-5">
-            <div className="instrument pointer-events-auto px-4 py-3">
-              <p className="label">{REGIONS[v.region].label} · {day ? fmtDate(day.date) : '—'}{m.source.kind !== 'model' && <span className="sm:hidden"> · reference</span>}</p>
-              <h1 key={`${layer.id}${v.depth}`} className="display fade-in mt-1 text-[22px] leading-tight sm:text-[24px]">{title}</h1>
-              <p className="mt-1.5 hidden text-[12px] leading-snug text-mute sm:block">{layer.help}</p>
-              {m.source.kind !== 'model' && (
-                <p className="mt-2 hidden border-t border-line pt-2 text-[11px] leading-snug text-mute sm:block">
-                  Showing {m.source.label}, a reference field, until the reconstruction is exported.
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* region framing */}
-          <div className="absolute right-14 top-3 z-[500] hidden sm:right-[56px] sm:top-5 md:block">
-            <div className="instrument flex items-center gap-4 px-3.5 py-2">
-              {Object.entries(REGIONS).map(([k, r]) => (
-                <button key={k} onClick={() => v.set({ region: k })} aria-pressed={v.region === k}
-                  className={`text-[12px] transition-colors ${v.region === k ? 'text-ink' : 'text-mute hover:text-ink'}`}>{r.label}</button>
-              ))}
-            </div>
-          </div>
+          <p className="label pointer-events-none absolute bottom-2 left-3 z-[500] hidden text-mute sm:block">Study domain · 5–30°N, 45–105°E · 0.25°</p>
 
           {/* hover readout follows the cursor */}
           {hover && hover.px && (

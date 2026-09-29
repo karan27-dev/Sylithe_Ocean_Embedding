@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
-import { MapContainer, Pane, TileLayer, CircleMarker, Rectangle, useMap, useMapEvents } from 'react-leaflet'
+import { MapContainer, Pane, Polygon, TileLayer, CircleMarker, Rectangle, useMap, useMapEvents } from 'react-leaflet'
 import { cellAt, gridBounds, REGIONS } from '../../lib/ocean'
 
 const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas'
 const DOMAIN = [[5, 45], [30, 105]]
+// Everything outside the study domain is faded, so an empty ocean reads as "out of scope", not "missing".
+const WORLD = [[-85, -180], [-85, 180], [85, 180], [85, -180]]
+const HOLE = [[5, 45], [30, 45], [30, 105], [5, 105]]
 
 /** Image overlay that cross-fades to each new field instead of blinking: depth and date changes read as motion. */
 function FadeOverlay({ url, bounds }) {
@@ -39,20 +42,31 @@ function Events({ grid, g, onPick, onHover }) {
   return null
 }
 
-/** Fly to a named region when it changes (and after the container resizes, keep it framed). */
+/** Frame the chosen region: fly on change, and re-frame when the container resizes (the probe panel
+ *  opening) unless the user has panned or zoomed by hand since. */
 function Framer({ region, padding }) {
   const map = useMap()
   const first = useRef(true)
+  const manual = useRef(false)
+  const target = () => REGIONS[region]?.bounds ?? DOMAIN
   useEffect(() => {
-    const b = REGIONS[region]?.bounds ?? DOMAIN
-    if (first.current) { map.fitBounds(b, { padding }); first.current = false; return }
-    map.flyToBounds(b, { padding, duration: 0.7, easeLinearity: 0.2 })
+    manual.current = false
+    if (first.current) { map.fitBounds(target(), { padding }); first.current = false; return }
+    map.flyToBounds(target(), { padding, duration: 0.7, easeLinearity: 0.2 })
   }, [region]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    const ro = new ResizeObserver(() => map.invalidateSize({ pan: false }))
-    ro.observe(map.getContainer())
-    return () => ro.disconnect()
-  }, [map])
+    const el = map.getContainer()
+    const mark = () => { manual.current = true }
+    map.on('dragstart', mark)
+    el.addEventListener('wheel', mark, { passive: true })
+    el.addEventListener('dblclick', mark)
+    const ro = new ResizeObserver(() => {
+      map.invalidateSize({ pan: false })
+      if (!manual.current) map.fitBounds(target(), { padding, animate: false })
+    })
+    ro.observe(el)
+    return () => { ro.disconnect(); map.off('dragstart', mark); el.removeEventListener('wheel', mark); el.removeEventListener('dblclick', mark) }
+  }, [map, region]) // eslint-disable-line react-hooks/exhaustive-deps
   return null
 }
 
@@ -71,7 +85,7 @@ export default function OceanMap({ g, url, grid, probe, onPick, onHover, points,
   const [ready, setReady] = useState(false)
   return (
     <MapContainer bounds={DOMAIN} minZoom={3} maxZoom={9} zoomSnap={0.25} zoomDelta={0.5} wheelPxPerZoomLevel={120}
-      maxBounds={[[-12, 20], [45, 130]]} zoomControl={false} attributionControl
+      maxBounds={[[-5, 30], [40, 120]]} zoomControl={false} attributionControl
       whenReady={() => setReady(true)} className={`h-full w-full ${className}`}>
       <TileLayer url={`${ESRI}/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}`} maxNativeZoom={16}
         attribution="Basemap © Esri" />
@@ -79,6 +93,10 @@ export default function OceanMap({ g, url, grid, probe, onPick, onHover, points,
       {/* place names sit above the data, below markers */}
       <Pane name="labels" style={{ zIndex: 450, pointerEvents: 'none' }}>
         <TileLayer url={`${ESRI}/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}`} maxNativeZoom={16} opacity={0.65} />
+      </Pane>
+      <Pane name="domain" style={{ zIndex: 440, pointerEvents: 'none' }}>
+        <Polygon positions={[WORLD, HOLE]} interactive={false} pathOptions={{ stroke: false, fillColor: '#F5F3EE', fillOpacity: 0.62 }} />
+        <Rectangle bounds={DOMAIN} interactive={false} pathOptions={{ color: '#15181A', weight: 0.8, opacity: 0.45, fill: false }} />
       </Pane>
       {showRegion && region !== 'NIO' && (
         <Rectangle bounds={REGIONS[region].bounds} interactive={false}
