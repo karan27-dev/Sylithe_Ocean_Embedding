@@ -32,10 +32,13 @@ web/          React + Leaflet + Recharts console, Sylithe design tokens
 
 Everything in notebooks 02–03, as one resumable command. Data comes straight from your Google Drive.
 
-**1 · Make the data archive (once, in Colab after notebook 01).** One big file downloads in minutes; the
-~55,000 small Zarr files would take an hour or more:
+**1 · Pack the data (once, Colab CPU runtime).** Drive is slow at the stores' ~55,000 one-day files, so they are
+read with 32 threads, rewritten as ~600 larger chunks and uploaded as one file; RunPod restores one-day chunks:
 ```python
-!tar -cf {ROOT}/cache_inputs_target.tar.part -C /content inputs.zarr target.zarr && mv {ROOT}/cache_inputs_target.tar.part {ROOT}/cache_inputs_target.tar
+from google.colab import drive; drive.mount('/content/drive')
+!git clone -q https://github.com/karan27-dev/Sylithe_Ocean_Embedding /content/code
+!pip -q install zarr
+!cd /content/code && python -m oceanembed.pack pack --src /content/drive/MyDrive/OceanEmbed --out /content/drive/MyDrive/OceanEmbed/pack.tar
 ```
 
 **2 · Create the pod.** PyTorch template, one GPU (RTX 4090 / L40S / A100), a **network volume of ~40 GB mounted at
