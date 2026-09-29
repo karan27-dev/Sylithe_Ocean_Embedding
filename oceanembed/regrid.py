@@ -78,7 +78,17 @@ def to_target_grid(da: xr.DataArray, M=None) -> xr.DataArray:
     src_res = float(np.abs(np.diff(da.lat.values)).mean())
     if src_res < RES * 0.8:
         return bin_average(da, M)
+    if _aligned(da.lat.values, LATS) and _aligned(da.lon.values, LONS):
+        # same 0.25° cell centres as ours (OSCAR, CCMP, GLORYS2V4): copy cells exactly. Linear interp at the
+        # nodes still multiplies the NaN neighbour by weight 0 and spreads every coastal gap into 4 cells.
+        return da.reindex(lat=LATS, lon=LONS, method="nearest", tolerance=1e-3).astype(np.float32)
     return da.interp(lat=LATS, lon=LONS, method="linear").astype(np.float32)
+
+
+def _aligned(src: np.ndarray, tgt: np.ndarray, tol=1e-3) -> bool:
+    """True if every target centre coincides with a source centre."""
+    idx = np.clip(np.searchsorted(src, tgt), 1, len(src) - 1)
+    return bool(np.all(np.minimum(np.abs(src[idx] - tgt), np.abs(src[idx - 1] - tgt)) < tol))
 
 
 def to_std_depths(da: xr.DataArray) -> xr.DataArray:
