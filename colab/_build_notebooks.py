@@ -181,10 +181,21 @@ SETUP,
 import torch, shutil, numpy as np, pandas as pd
 print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'NO GPU: Runtime → Change runtime type')
 from oceanembed import config as C, dataset as D, train as TR, baselines as B
-# Drive is slow at many small files: copy the stores to the local disk once per session (~20–40 min)
-for s in ['inputs.zarr', 'target.zarr']:
-    if not os.path.exists(f'/content/{s}'):
-        print('copying', s); shutil.copytree(f'{ROOT}/{s}', f'/content/{s}')
+# Drive is slow at tens of thousands of small files, fast at one big file. First session: copy the stores
+# (~40 min, into a .part folder so an interrupted copy is never mistaken for a finished one), then save one
+# archive to Drive. Every later session just unpacks that archive (a few minutes).
+STORES, TAR = ['inputs.zarr', 'target.zarr'], f'{ROOT}/cache_inputs_target.tar'
+if not all(os.path.exists(f'/content/{s}') for s in STORES):
+    if os.path.exists(TAR):
+        print('unpacking cached archive')
+        !tar -xf {TAR} -C /content
+    else:
+        for s in STORES:
+            if not os.path.exists(f'/content/{s}'):
+                print('copying', s); shutil.rmtree(f'/content/{s}.part', ignore_errors=True)
+                shutil.copytree(f'{ROOT}/{s}', f'/content/{s}.part'); os.rename(f'/content/{s}.part', f'/content/{s}')
+        print('saving archive for fast future sessions')
+        !tar -cf {TAR}.part -C /content inputs.zarr target.zarr && mv {TAR}.part {TAR}
 STATS = f'{ROOT}/stats_v2.npz'                    # v2 = includes the input climatology for anomaly channels
 if not os.path.exists(STATS):
     D.compute_stats('/content/inputs.zarr', '/content/target.zarr', STATS)
