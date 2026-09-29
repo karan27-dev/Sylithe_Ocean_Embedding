@@ -92,14 +92,16 @@ def blocks(start, end, days):
 _CMEMS_CACHE: dict = {}
 
 
-def cmems_open(dataset_id: str, variable: str, depth: bool = False, service: str = "arco-geo-series") -> xr.DataArray:
+def cmems_open(dataset_id: str, variable: str, depth: bool = False, service: str = "arco-geo-series",
+               chunk_size_limit: int = -1) -> xr.DataArray:
     import copernicusmarine as cm
-    key = (dataset_id, variable, service)
+    key = (dataset_id, variable, service, chunk_size_limit)
     if key not in _CMEMS_CACHE:
         # Force the map-optimised layout (chunks = 1 day × ~1000² cells). Over a 30-year span the client can
         # otherwise pick "arco-time-series" (chunks = ~3000 days × 16² cells), and then every month we read
         # drags in ~8 years of data per tile: that was the slowness and the RAM growth in the first full run.
-        kw = dict(dataset_id=dataset_id, variables=[variable], service=service, **C.BBOX)
+        kw = dict(dataset_id=dataset_id, variables=[variable], service=service, chunk_size_limit=chunk_size_limit,
+                  **C.BBOX)
         if depth:
             kw.update(minimum_depth=0, maximum_depth=C.GLORYS_MAX_DEPTH)
         _CMEMS_CACHE[key] = _std_coords(cm.open_dataset(**kw)[variable])   # lazy ARCO/Zarr, nothing downloaded yet
@@ -393,18 +395,16 @@ def depth_plan(src: np.ndarray):
 
 def _level_to_grid(level: xr.DataArray, M) -> np.ndarray:
     """(time, lat, lon) source level → (time, 101, 241) float32 on the target grid (NaN outside this band)."""
-    a = np.empty(level.shape, dtype=np.float32)
-    step = 256
-    for i in range(0, level.sizes["time"], step):            # cast to float32 as slices arrive
-        a[i:i + step] = level.isel(time=slice(i, i + step)).values
-    lv = level.copy(data=a)
+    # One read for the whole window: windows follow the storage chunks, so every tile is fetched exactly once
+    # (slicing a window in time would re-download the same ~2000-day tiles for each slice).
+    lv = level.copy(data=np.asarray(level.values, dtype=np.float32))
     if M is not None:
         return bin_average(lv, M).values
     # native 0.25° (GLORYS2V4): same cell centres as ours, so select exactly instead of interpolating
     return lv.reindex(lat=C.LATS, lon=C.LONS, method="nearest", tolerance=1e-3).values
 
 
-def ingest_target(root: str, product: str | None = None, band_rows: int = 32, dask_threads: int = 16,
+def ingest_target(root: str, product: str | None = None, band_rows: int = 16, dask_threads: int = 8,
                   write_days: int = 128, log=print):
     """Target reanalysis → target.zarr via the arco-time-series layout.
 
@@ -417,7 +417,9 @@ def ingest_target(root: str, product: str | None = None, band_rows: int = 32, da
     did, var = C.TARGETS[product]
     path = os.path.join(root, "target.zarr")
     init_store(path, ["thetao"], with_depth=True, encode_int16=True)
-    da = cmems_open(did, var, depth=True, service="arco-time-series")
+    # chunk_size_limit=1 → dask chunks = storage tiles. The client's default (-1) merges up to 100 tiles per dask
+    # chunk, preferring the depth axis, so reading one level loaded dozens of levels at once: the RAM crash.
+    da = cmems_open(did, var, depth=True, service="arco-time-series", chunk_size_limit=1)
     src_z = da.depth.values.astype(float)
     plan = depth_plan(src_z)
     tlen = _ts_time_chunk(did, var)
