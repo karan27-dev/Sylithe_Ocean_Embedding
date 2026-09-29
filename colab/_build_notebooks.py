@@ -164,125 +164,147 @@ print('target', float(T.isel(depth=0).where(ocean).notnull().sum() / (ocean.sum(
 
 NB2 = [
 ("markdown", """
-# 02 · Train — embedding engine → gridded-Argo pretrain → GLORYS fine-tune
-Runtime: **GPU** (T4 works; A100/L4 ≈ 3× faster). Checkpoints go to Drive every epoch and training resumes.
+# 02 · Train — embedding engine → GLORYS fine-tune (seed ensemble) + the models we compare against
+Runtime: **GPU** (T4 works; L4/A100 faster). Every stage checkpoints to Drive each epoch and resumes after a
+disconnect: just re-run the same cell.
+
+| Cell | What | Needed for the leaderboard |
+|---|---|---|
+| Stage 0 | self-supervised embedding engine (no labels) | ✅ |
+| Stage 2 | OceanEmbed fine-tune on GLORYS, one run per seed | ✅ (≥1 seed; 3 seeds = ensemble) |
+| Published method | Attention 3D U-Net++ (Wang et al., ESSD 2026) retrained on **our** data | ✅ |
+| Ridge | classical statistical baseline | ✅ |
+| Ablation | input-window length | optional |
 """),
 SETUP,
 ("code", r'''
-import torch, shutil, numpy as np
+import torch, shutil, numpy as np, pandas as pd
 print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'NO GPU: Runtime → Change runtime type')
-from oceanembed import config as C, dataset as D, train as TR
-# Local copy: Drive reads per sample are slow, local SSD is fast
-for s in ['inputs.zarr', 'target.zarr', 'inputs_monthly.zarr', 'argo_monthly.zarr']:
-    if os.path.exists(f'{ROOT}/{s}') and not os.path.exists(f'/content/{s}'):
-        shutil.copytree(f'{ROOT}/{s}', f'/content/{s}')
-STATS = f'{ROOT}/stats.npz'
-if not os.path.exists(STATS): D.compute_stats('/content/inputs.zarr', '/content/target.zarr', STATS)
+from oceanembed import config as C, dataset as D, train as TR, baselines as B
+# Drive is slow at many small files: copy the stores to the local disk once per session (~20–40 min)
+for s in ['inputs.zarr', 'target.zarr']:
+    if not os.path.exists(f'/content/{s}'):
+        print('copying', s); shutil.copytree(f'{ROOT}/{s}', f'/content/{s}')
+STATS = f'{ROOT}/stats_v2.npz'                    # v2 = includes the input climatology for anomaly channels
+if not os.path.exists(STATS):
+    D.compute_stats('/content/inputs.zarr', '/content/target.zarr', STATS)
 S = D.load_stats(STATS)
-cfg = C.TrainConfig(window=15, base=32, batch_size=8)
-CK = f'{ROOT}/checkpoints/{cfg.arch}_w{cfg.window}'
+cfg = C.TrainConfig()                             # window 15, base 32, β-NLL 0.5, EMA 0.999
+CK = f'{ROOT}/checkpoints/oceanembed_w{cfg.window}'
+windows = lambda period, train, c=cfg: D.SurfaceWindows('/content/inputs.zarr', '/content/target.zarr', S, period,
+                                                        c.window, train=train, var_dropout=c.var_dropout if train else 0)
+print('train days', len(windows(C.TRAIN, False)), '| val days', len(windows(C.VAL, False)))
 '''),
 ("markdown", "## Stage 0 · Self-supervised embedding engine (masked surface autoencoder, no labels)"),
 ("code", r'''
-mk = lambda period, train: D.SurfaceWindows('/content/inputs.zarr', None, S, period, cfg.window, train=train,
-                                            var_dropout=cfg.var_dropout if train else 0, patch_mask=0.5, need_target=False)
-mae, net = TR.new_models(cfg)
-TR.fit(mae, mk(C.TRAIN, True), mk(C.VAL, False), cfg, 'ssl', CK, cfg.epochs_ssl)
-TR.load_encoder_from_ssl(net, f'{CK}/ssl_best.pt')
-'''),
-("markdown", "## Stage 1 · Gridded-Argo monthly pretrain (skipped automatically if notebook 01 had no files)"),
-("code", r'''
-if os.path.exists('/content/argo_monthly.zarr'):
-    Sm = dict(S)   # same normalisation; monthly samples use the mid-month climatology
-    mkm = lambda p, tr: D.SurfaceWindows('/content/inputs_monthly.zarr', '/content/argo_monthly.zarr', Sm, p,
-                                         cfg.window, train=tr, var_dropout=cfg.var_dropout if tr else 0)
-    TR.fit(net, mkm(C.TRAIN, True), mkm(C.VAL, False), cfg, 'argo', CK, cfg.epochs_argo, depth_std=S['depth_std'])
-    TR.load_weights(net, f'{CK}/argo_best.pt')
-'''),
-("markdown", "## Stage 2 · GLORYS daily fine-tune — all layers trainable (the paper's best strategy)"),
-("code", r'''
-mkd = lambda p, tr: D.SurfaceWindows('/content/inputs.zarr', '/content/target.zarr', S, p, cfg.window,
-                                     train=tr, var_dropout=cfg.var_dropout if tr else 0)
-TR.fit(net, mkd(C.TRAIN, True), mkd(C.VAL, False), cfg, 'glorys', CK, cfg.epochs_glorys, depth_std=S['depth_std'])
-'''),
-("code", r'''
-# Validation skill per depth (vs GLORYS 2022)
-import pandas as pd
-v = torch.load(f'{CK}/glorys_best.pt', weights_only=False)['val']['per_depth']
-pd.DataFrame(v).T.round(3)
+ssl = lambda period, train: D.SurfaceWindows('/content/inputs.zarr', None, S, period, cfg.window, train=train,
+                                             var_dropout=cfg.var_dropout if train else 0, patch_mask=0.5, need_target=False)
+mae, _ = TR.new_models(cfg)
+TR.fit(mae, ssl(C.TRAIN, True), ssl(C.VAL, False), cfg, 'ssl', CK, cfg.epochs_ssl)
 '''),
 ("markdown", """
-## Baseline · faithful Attention 3D U-Net++ (Wang et al., ESSD 2026)
-Same data, no embedding pretraining. Needed for the "ours vs published method" table.
+## Stage 2 · OceanEmbed on GLORYS, all layers trainable (the paper's best transfer strategy)
+One run per seed. Start with one seed; if GPU time allows, add two more: the ensemble of 3 usually lowers RMSE.
+The printed `val RMSE °C` is against GLORYS 2022 (validation year, used only to pick the best epoch).
 """),
 ("code", r'''
-cfg3 = C.TrainConfig(window=15, base=16, batch_size=2, arch='attn_unetpp3d')
-_, net3 = TR.new_models(cfg3)
-CK3 = f'{ROOT}/checkpoints/attn_unetpp3d_w15'
-TR.fit(net3, mkd(C.TRAIN, True), mkd(C.VAL, False), cfg3, 'glorys', CK3, cfg3.epochs_glorys, depth_std=S['depth_std'])
+SEEDS = [42]                     # e.g. [42, 7, 1234] for a 3-model ensemble
+for seed in SEEDS:
+    c = C.TrainConfig(**{**cfg.__dict__, 'seed': seed})
+    _, net = TR.new_models(c)
+    TR.load_encoder_from_ssl(net, f'{CK}/ssl_best.pt')
+    TR.fit(net, windows(C.TRAIN, True, c), windows(C.VAL, False, c), c, 'glorys', f'{CK}/seed{seed}', c.epochs_glorys,
+           depth_std=S['depth_std'])
 '''),
-("markdown", "## Ablation · input window length (paper: gain saturates ≈ 26 d)"),
 ("code", r'''
-for w in [1, 7, 26]:
+# Validation RMSE per depth (°C, vs GLORYS 2022) for the best epoch of each seed
+rows = {f'seed {s}': torch.load(f'{CK}/seed{s}/glorys_best.pt', weights_only=False)['val']['per_depth'] for s in SEEDS
+        if os.path.exists(f'{CK}/seed{s}/glorys_best.pt')}
+pd.DataFrame({k: {d: v[d]['rmse'] for d in v} for k, v in rows.items()}).round(3)
+'''),
+("markdown", """
+## Published method · Attention 3D U-Net++ (Wang et al., ESSD 2026), retrained on our exact data
+Same inputs, years, grid and scoring. This is the "we beat the published state of the art" comparison.
+"""),
+("code", r'''
+cfg3 = C.TrainConfig(arch='attn_unetpp3d', base=16, batch_size=2)
+_, net3 = TR.new_models(cfg3)
+TR.fit(net3, windows(C.TRAIN, True, cfg3), windows(C.VAL, False, cfg3), cfg3, 'glorys',
+       f'{ROOT}/checkpoints/attn_unetpp3d_w{cfg3.window}', cfg3.epochs_glorys, depth_std=S['depth_std'])
+'''),
+("markdown", "## Classical baseline · ridge regression (CPU, a few minutes)"),
+("code", r'''
+os.makedirs(f'{ROOT}/baselines', exist_ok=True)
+B.Ridge(S).fit(windows(C.TRAIN, False), n_days=400).save(f'{ROOT}/baselines/ridge.npz')
+'''),
+("markdown", "## Optional ablation · input window length (paper: gain saturates ≈ 26 d)"),
+("code", r'''
+for w in [7, 26]:
     c = C.TrainConfig(window=w, epochs_glorys=20)
     _, n = TR.new_models(c); TR.load_encoder_from_ssl(n, f'{CK}/ssl_best.pt')   # encoder is window-agnostic
-    mk_w = lambda p, tr: D.SurfaceWindows('/content/inputs.zarr', '/content/target.zarr', S, p, w, train=tr,
-                                          var_dropout=c.var_dropout if tr else 0)
-    print(w, TR.fit(n, mk_w(C.TRAIN, True), mk_w(C.VAL, False), c, 'glorys', f'{ROOT}/checkpoints/ablate_w{w}',
-                    c.epochs_glorys, depth_std=S['depth_std']))
+    print(w, TR.fit(n, windows(C.TRAIN, True, c), windows(C.VAL, False, c), c, 'glorys',
+                    f'{ROOT}/checkpoints/ablate_w{w}', c.epochs_glorys, depth_std=S['depth_std']))
 '''),
 ]
 
 NB3 = [
 ("markdown", """
-# 03 · Reconstruct 2023, validate independently, export for the console
-Test year 2023 was never seen in training. Scores against **GLORYS** (the target), **HYCOM** (your GEE,
-independent model) and **Argo** profiles (independent observations), for NIO / Bay of Bengal / Arabian Sea.
+# 03 · Leaderboard on the held-out year 2023, independent Argo check, and export
+Every method is scored on the same year (never used in training), grid, depths and Argo profiles.
+GLORYS and HYCOM are scored against the same floats, so the Argo column compares like with like.
 """),
 SETUP,
 ("code", r'''
-import torch, numpy as np, pandas as pd, xarray as xr, shutil
-from oceanembed import config as C, dataset as D, train as TR, infer as I, argo as A, metrics as M
+import glob, shutil, torch, numpy as np, pandas as pd, xarray as xr
+from oceanembed import config as C, dataset as D, train as TR, infer as I, baselines as B, benchmark as BM
 for s in ['inputs.zarr', 'target.zarr', 'hycom.zarr']:
-    if os.path.exists(f'{ROOT}/{s}') and not os.path.exists(f'/content/{s}'): shutil.copytree(f'{ROOT}/{s}', f'/content/{s}')
-S = D.load_stats(f'{ROOT}/stats.npz')
-cfg = C.TrainConfig(window=15)
-_, net = TR.new_models(cfg); TR.load_weights(net, f'{ROOT}/checkpoints/{cfg.arch}_w{cfg.window}/glorys_best.pt')
-rec = I.reconstruct(net, '/content/inputs.zarr', S, *C.TEST, window=cfg.window)
-rec.to_netcdf(f'{ROOT}/OceanEmbed_NIO_T_2023.nc')          # the PS deliverable
+    if os.path.exists(f'{ROOT}/{s}') and not os.path.exists(f'/content/{s}'):
+        print('copying', s); shutil.copytree(f'{ROOT}/{s}', f'/content/{s}')
+S = D.load_stats(f'{ROOT}/stats_v2.npz')
+cfg = C.TrainConfig(); CK = f'{ROOT}/checkpoints/oceanembed_w{cfg.window}'
+G = xr.open_zarr('/content/target.zarr').thetao.sel(time=slice(*C.TEST))
+prof = pd.read_parquet(f'{ROOT}/argo_2023.parquet'); print(len(prof), 'Argo profiles')
+lb = BM.Leaderboard(G, prof)
+def load(ckpt, c):
+    _, m = TR.new_models(c); return TR.load_weights(m, ckpt)
 '''),
 ("code", r'''
-# ── vs GLORYS and vs HYCOM, per depth and region ────────────────────────────
-gl = xr.open_zarr('/content/target.zarr').thetao.sel(time=rec.time)
-hy = xr.open_zarr('/content/hycom.zarr').thetao.sel(time=rec.time)
-rows = []
-for reg in C.REGIONS:
-    mask = M.region_mask(reg)
-    for name, ref in [('GLORYS', gl), ('HYCOM', hy)]:
-        s = M.skill(np.where(mask, rec.thetao.values, np.nan), np.where(mask, ref.values, np.nan))
-        rows += [dict(region=reg, vs=name, depth=d, **v) for d, v in s.items()]
-skill = pd.DataFrame(rows); skill.to_csv(f'{ROOT}/skill_2023.csv', index=False)
-skill.pivot_table(index='depth', columns=['region', 'vs'], values='rmse').round(3)
+# OceanEmbed: every trained seed (ensemble) and the first seed alone
+seeds = sorted(glob.glob(f'{CK}/seed*/glorys_best.pt')); print('seeds:', seeds)
+members = [load(p, cfg) for p in seeds]
+rec = I.reconstruct(members, '/content/inputs.zarr', S, *C.TEST, window=cfg.window)
+rec.to_netcdf(f'{ROOT}/OceanEmbed_NIO_T_2023.nc')                     # the PS deliverable (with σ)
+lb.add(f'OceanEmbed ({len(members)}-model ensemble)', 'ours', rec.thetao)
+if len(members) > 1:
+    lb.add('OceanEmbed (single model)', 'ours', I.reconstruct(members[0], '/content/inputs.zarr', S, *C.TEST, window=cfg.window).thetao)
 '''),
 ("code", r'''
-# ── Independent Argo check: ours vs GLORYS vs HYCOM at the same profiles ────
-prof = pd.read_parquet(f'{ROOT}/argo_2023.parquet')
-m = A.match(A.match(A.match(prof, rec.thetao, 'ours'), gl, 'glorys'), hy, 'hycom')
-tab = {n: A.score(m, n).set_index('depth')[['rmse', 'bias', 'r']] for n in ['ours', 'glorys', 'hycom']}
-argo_skill = pd.concat(tab, axis=1); argo_skill.to_csv(f'{ROOT}/argo_skill_2023.csv'); argo_skill.round(3)
+# The published method, retrained on our data; then the baselines; then reference products vs Argo
+cfg3 = C.TrainConfig(arch='attn_unetpp3d', base=16, batch_size=2)
+p3 = f'{ROOT}/checkpoints/attn_unetpp3d_w{cfg3.window}/glorys_best.pt'
+if os.path.exists(p3):
+    lb.add('Attention 3D U-Net++ (Wang et al. 2026), retrained here', 'published method (retrained here)',
+           I.reconstruct(load(p3, cfg3), '/content/inputs.zarr', S, *C.TEST, window=cfg3.window).thetao)
+lb.add(B.Ridge.name, 'baseline', I.reconstruct_baseline(B.Ridge(S).load(f'{ROOT}/baselines/ridge.npz'),
+       '/content/inputs.zarr', S, *C.TEST, window=cfg.window).thetao)
+lb.add(B.Climatology.name, 'baseline', I.reconstruct_baseline(B.Climatology(S), '/content/inputs.zarr', S, *C.TEST,
+       window=cfg.window).thetao)
+lb.add('GLORYS12 reanalysis (the training target)', 'reference product', G, vs_glorys=False)
+if os.path.exists('/content/hycom.zarr'):
+    lb.add('HYCOM GOFS 3.1 (independent model, via GEE)', 'reference product', xr.open_zarr('/content/hycom.zarr').thetao)
+summary = lb.save(f'{ROOT}/leaderboard'); summary.round(3)
 '''),
 ("code", r'''
-# ── Is the predicted uncertainty honest? (fraction of Argo errors inside ±1σ should be ≈ 68 %) ──
-sig = A.match(prof, rec.thetao_sigma, 'sig')
-inside = [(np.abs(m[f'ours_T{d}'] - m[f'T{d}']) <= sig[f'sig_T{d}']).mean() for d in C.DEPTHS]
+# Is the predicted uncertainty honest? Fraction of Argo errors inside ±1σ should be ≈ 68 %
+m = BM.A.match(BM.A.match(prof, rec.thetao, 'ours'), rec.thetao_sigma, 'sig')
+inside = [(np.abs(m[f'ours_T{d}'] - m[f'T{d}']) <= m[f'sig_T{d}']).mean() for d in C.DEPTHS]
 pd.Series(inside, index=C.DEPTHS, name='coverage@1σ').round(2)
 '''),
 ("code", r'''
-# ── Export for the web console → download the folder into OceanEmbed/web/public/data/ ──
-days = pd.date_range('2023-05-01', '2023-05-31')   # e.g. the pre-monsoon / Cyclone Mocha window
-I.export_web(rec.sel(time=days), f'{ROOT}/web_export', comparison=gl.sel(time=days).to_dataset(name='thetao'))
-flat = argo_skill.copy(); flat.columns = [f'{a}_{b}' for a, b in flat.columns]   # ours_rmse, glorys_bias, ...
-open(f'{ROOT}/web_export/skill.json', 'w').write(flat.reset_index().to_json(orient='records'))
+# Export for the web console → download into OceanEmbed/web/public/data/
+days = pd.date_range('2023-05-01', '2023-05-31')   # pre-monsoon / Cyclone Mocha window
+I.export_web(rec.sel(time=days), f'{ROOT}/web_export', comparison=G.sel(time=days).to_dataset(name='thetao'))
+shutil.copy(f'{ROOT}/leaderboard/leaderboard.json', f'{ROOT}/web_export/leaderboard.json')
 '''),
 ]
 
