@@ -91,6 +91,27 @@ def static_channels(ocean, doy):
     return np.stack([ocean, lat, lon, np.full((H, W), np.sin(ang)), np.full((H, W), np.cos(ang))]).astype("f4")
 
 
+_INPUT_CACHE: dict = {}
+
+
+def _load_inputs(inputs_path, stats) -> np.ndarray:
+    """Whole input record in RAM as float16 (~2.4 GB for 2005–2023), shared by every dataset built on the same
+    store (train/val/SSL/baselines); separate copies would need ~10 GB. Normalised one variable at a time so
+    the float32 copy never exists for all 7 at once."""
+    key = (inputs_path, float(stats["sst_mean"]))
+    if key not in _INPUT_CACHE:
+        _INPUT_CACHE.clear()
+        ds = xr.open_zarr(inputs_path)
+        inp = np.empty((len(C.INPUT_VARS), ds.sizes["time"], len(C.LATS), len(C.LONS)), dtype="f2")
+        land = stats["ocean"] <= 0
+        for i, v in enumerate(C.INPUT_VARS):
+            a = (ds[v].values.astype("f4") - stats[f"{v}_mean"]) / stats[f"{v}_std"]
+            a[:, land] = np.nan                                   # land → "missing", never a value
+            inp[i] = a
+        _INPUT_CACHE[key] = inp
+    return _INPUT_CACHE[key]
+
+
 class SurfaceWindows(Dataset):
     """Items: x (2V,T,H,W) = [raw, anomaly], missing (2V,T,H,W), static (5,H,W), y (15,H,W), m (15,H,W),
     plus physical helpers (clim, sst at t). All spatial arrays padded to (PAD_H, PAD_W)."""
@@ -101,14 +122,7 @@ class SurfaceWindows(Dataset):
         self.var_dropout, self.patch_mask = var_dropout, patch_mask
         ds = xr.open_zarr(inputs_path)
         self.time = pd.DatetimeIndex(ds.time.values)
-        # whole input record in RAM as float16 (~2.4 GB for 2005–2023). Normalised one variable at a time
-        # so the float32 copy never exists for all 7 at once (that would peak near 5 GB).
-        self.inp = np.empty((len(C.INPUT_VARS), ds.sizes["time"], len(C.LATS), len(C.LONS)), dtype="f2")
-        land = stats["ocean"] <= 0
-        for i, v in enumerate(C.INPUT_VARS):
-            a = (ds[v].values.astype("f4") - stats[f"{v}_mean"]) / stats[f"{v}_std"]
-            a[:, land] = np.nan                                   # land → "missing", never a value
-            self.inp[i] = a
+        self.inp = _load_inputs(inputs_path, stats)
         self.T = xr.open_zarr(target_path)["thetao"] if need_target else None
         # searchsorted (not get_loc) so the same class works on the monthly stores of the Argo stage
         t0 = int(self.time.searchsorted(pd.Timestamp(period[0])))
