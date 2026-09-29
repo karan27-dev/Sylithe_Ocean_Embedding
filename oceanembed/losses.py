@@ -15,9 +15,14 @@ def masked_mean(x, m):
     return (x * m).sum() / m.sum().clamp_min(1)
 
 
-def gaussian_nll(mean, logvar, y, m):
-    """Heteroscedastic loss: learns a per-pixel, per-depth uncertainty alongside the value."""
-    return masked_mean(0.5 * (logvar + (y - mean) ** 2 * torch.exp(-logvar)), m)
+def gaussian_nll(mean, logvar, y, m, beta: float = 0.5):
+    """Heteroscedastic β-NLL (Seitzer et al., ICLR 2022): learns a per-pixel, per-depth uncertainty
+    alongside the value. Plain NLL (β=0) lets the network down-weight hard pixels by inflating their
+    variance, which hurts RMSE; weighting each term by σ^(2β) (no gradient) removes that, β=1 ≈ MSE."""
+    nll = 0.5 * (logvar + (y - mean) ** 2 * torch.exp(-logvar))
+    if beta:
+        nll = nll * torch.exp(logvar).detach() ** beta
+    return masked_mean(nll, m)
 
 
 def vertical_gradient(pred_T, true_T, m):

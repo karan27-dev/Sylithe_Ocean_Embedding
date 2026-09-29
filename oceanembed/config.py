@@ -106,6 +106,8 @@ class TrainConfig:
     var_dropout: float = 0.3    # P(drop each droppable input variable) — trains the SST+SSH-only mode
     w_surface: float = 0.1      # T(0 m) ≈ SST consistency
     w_vgrad: float = 0.5        # vertical-gradient (thermocline sharpness) loss
+    beta_nll: float = 0.5       # β-NLL weighting (0 = plain NLL, 1 ≈ MSE); protects RMSE while learning σ
+    ema_decay: float = 0.999    # EMA of weights used for validation, checkpoints and inference
     arch: str = "embed_unetpp2d"   # or "attn_unetpp3d" (faithful replication of Wang et al. 2026)
     amp: bool = True
     num_workers: int = 2
