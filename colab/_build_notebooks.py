@@ -115,8 +115,17 @@ print('period', C.START, '→', C.END)
 ingest.ingest_inputs(ROOT, days_per_block=31)
 '''),
 ("code", r'''
-# GLORYS target: streamed from Copernicus ARCO, vertical → 15 std depths, 1/12° → 0.25° area mean.
-ingest.ingest_glorys(ROOT, days_per_block=8)
+# Target (OUTPUT) data via the fast time-series layout: ~2000-day windows, level by level, in lat bands.
+# C.TARGET_PRODUCT = 'glorys12' (PS target, 1/12° → 0.25°) or 'glorys2v4' (paper's target, native 0.25°, ~6× faster)
+from oceanembed import config as C, ingest
+C.TARGET_PRODUCT = 'glorys12'
+ingest.ingest_target(ROOT)
+'''),
+("code", r'''
+# Optional (~30 min): re-fetch OSCAR currents with the exact-grid fix (earlier runs lost one ring of coastal
+# cells: ocean-valid 0.47 → ~0.52). Winds were unaffected, so only uc/vc are redone.
+ingest.forget(f'{ROOT}/inputs.zarr', ['uc:', 'vc:'])
+ingest.ingest_inputs(ROOT, variables=['uc', 'vc'], workers=8)
 '''),
 ("code", r'''
 # Independent comparator from YOUR Google Earth Engine account (not used in training)
