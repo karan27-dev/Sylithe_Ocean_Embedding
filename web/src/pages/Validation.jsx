@@ -10,10 +10,56 @@ const SERIES = [
   { key: 'hycom', label: 'HYCOM', color: '#94a3b8' },
 ]
 
+const KIND_STYLE = {
+  ours: 'bg-mist text-abyss',
+  'published method (retrained here)': 'bg-amber-50 text-amber-800',
+  baseline: 'bg-gray-100 text-gray-600',
+  'reference product': 'bg-blue-50 text-blue-700',
+}
+const COLS = ['RMSE vs Argo (°C)', 'RMSE vs GLORYS (°C)', 'Argo Bay of Bengal', 'Argo Arabian Sea', 'Argo bias (°C)']
+
+function Leaderboard({ board }) {
+  return (
+    <div className="card overflow-hidden">
+      <div className="px-5 pt-5 pb-3">
+        <p className="eyebrow">Leaderboard · test year 2023, never seen in training · same grid, depths and Argo floats for every row</p>
+      </div>
+      <table className="w-full text-[13px]">
+        <thead className="bg-gray-50 text-left">
+          <tr>
+            <th className="eyebrow px-4 py-3">#</th><th className="eyebrow px-4 py-3">Method</th><th className="eyebrow px-4 py-3">Type</th>
+            {COLS.map((c) => <th key={c} className="eyebrow px-4 py-3 text-right">{c}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {board.rows.map((r, i) => (
+            <tr key={r.Method} className={`border-t border-gray-100 ${r.Type === 'ours' ? 'bg-mist/40' : ''}`}>
+              <td className="px-4 py-3 font-mono text-gray-400">{i + 1}</td>
+              <td className="px-4 py-3 font-semibold">{r.Method}</td>
+              <td className="px-4 py-3"><span className={`chip ${KIND_STYLE[r.Type] || 'bg-gray-100'}`}>{r.Type}</span></td>
+              {COLS.map((c) => <td key={c} className="px-4 py-3 text-right font-mono">{r[c] == null ? '—' : Number(r[c]).toFixed(3)}</td>)}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {board.context?.length > 0 && (
+        <div className="px-5 py-4 border-t border-gray-100 text-[12px] text-gray-500">
+          <p className="eyebrow mb-1">Published results, for context only (different region, depths or reference data)</p>
+          {board.context.map((c) => (
+            <p key={c.method}>{c.method}: {Object.entries(c).filter(([k]) => k.startsWith('rmse')).map(([k, v]) => `${v} °C`).join(', ')} · {c.setup}</p>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function Validation() {
   const [rows, setRows] = useState(null)
+  const [board, setBoard] = useState(null)
   useEffect(() => {
     fetch('/data/skill.json').then((r) => (r.ok ? r.json() : null)).then(setRows).catch(() => setRows(null))
+    fetch('/data/leaderboard.json').then((r) => (r.ok ? r.json() : null)).then(setBoard).catch(() => setBoard(null))
   }, [])
 
   return (
@@ -22,6 +68,7 @@ export default function Validation() {
         <p className="eyebrow">Independent: 2023 held out · Argo profiles never used in training · notebook 03</p>
         <h1 className="text-[26px] font-bold">Validation</h1>
       </div>
+      {board && <Leaderboard board={board} />}
       {!rows ? (
         <div className="card p-10 flex flex-col items-center text-center">
           <FlaskConical size={36} className="text-gray-300 mb-3" />
