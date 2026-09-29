@@ -16,35 +16,54 @@ from .metrics import isotherm_depth, mld, tchp
 from .train import DEV
 
 
-@torch.no_grad()
-def reconstruct(model, inputs_path, stats, start, end, window, batch=4, mc_dropout=False):
-    ds = SurfaceWindows(inputs_path, None, stats, (start, end), window=window, need_target=False)
-    model.to(DEV).eval()
-    std = torch.tensor(stats["depth_std"], device=DEV).view(1, -1, 1, 1)
-    means, sigmas, times = [], [], []
-    loader = torch.utils.data.DataLoader(ds, batch)
-    for b in loader:
-        mean, logvar, _ = model(b["x"].to(DEV), b["missing"].to(DEV), b["static"].to(DEV))
-        doy = [min(ds.time[int(t)].dayofyear, 366) - 1 for t in b["t"]]
-        clim = torch.tensor(stats["clim"][doy], device=DEV)
-        T = unpad(mean * std)[:, :, :, :] + torch.nan_to_num(clim)
-        sig = unpad(torch.exp(0.5 * logvar) * std)
-        means.append(T.cpu().numpy()); sigmas.append(sig.cpu().numpy())
-        times += [ds.time[int(t)] for t in b["t"]]
-    T = np.concatenate(means); S = np.concatenate(sigmas)
+def _to_dataset(T, S, times, stats, source):
     ocean = stats["ocean"] > 0
-    clim_valid = np.isfinite(stats["clim"][0])          # sea-floor mask per depth
-    T = np.where(ocean & clim_valid, T, np.nan); S = np.where(ocean & clim_valid, S, np.nan)
+    valid = ocean & np.isfinite(stats["clim"][0])        # land and sea-floor mask per depth
+    T = np.where(valid, T, np.nan)
     coords = {"time": pd.DatetimeIndex(times), "depth": np.array(C.DEPTHS, float), "lat": C.LATS, "lon": C.LONS}
-    out = xr.Dataset({
-        "thetao": (("time", "depth", "lat", "lon"), T.astype("f4"),
-                   {"units": "degC", "long_name": "reconstructed sea water potential temperature"}),
-        "thetao_sigma": (("time", "depth", "lat", "lon"), S.astype("f4"),
-                         {"units": "degC", "long_name": "predicted 1-sigma uncertainty"}),
-    }, coords=coords, attrs={"title": "OceanEmbed NIO subsurface temperature reconstruction",
-                             "source": "surface satellite observations only (SST, SSS, SLA, currents, winds)",
-                             "grid": "0.25 deg, daily", "Conventions": "CF-1.8"})
-    return out
+    data = {"thetao": (("time", "depth", "lat", "lon"), T.astype("f4"),
+                       {"units": "degC", "long_name": "reconstructed sea water potential temperature"})}
+    if S is not None:
+        data["thetao_sigma"] = (("time", "depth", "lat", "lon"), np.where(valid, S, np.nan).astype("f4"),
+                                {"units": "degC", "long_name": "predicted 1-sigma uncertainty"})
+    return xr.Dataset(data, coords=coords, attrs={
+        "title": "OceanEmbed NIO subsurface temperature reconstruction", "source": source,
+        "grid": "0.25 deg, daily", "Conventions": "CF-1.8"})
+
+
+@torch.no_grad()
+def reconstruct(models, inputs_path, stats, start, end, window, batch=4):
+    """Daily 3D temperature from surface inputs. `models` may be one network or a list (seed ensemble):
+    the ensemble mean is the prediction, and σ² = mean of member variances + spread of member means."""
+    models = models if isinstance(models, (list, tuple)) else [models]
+    ds = SurfaceWindows(inputs_path, None, stats, (start, end), window=window, need_target=False)
+    for m in models:
+        m.to(DEV).eval()
+    std = torch.tensor(stats["depth_std"], device=DEV).view(1, -1, 1, 1)
+    Ts, Ss, times = [], [], []
+    for b in torch.utils.data.DataLoader(ds, batch):
+        outs = [m(b["x"].to(DEV), b["missing"].to(DEV), b["static"].to(DEV)) for m in models]
+        mu = torch.stack([o[0] for o in outs])                                  # (M, B, 15, H, W), normalised
+        var = torch.stack([torch.exp(o[1]) for o in outs]).mean(0) + mu.var(0, unbiased=False)
+        doy = [int(ds.doy[int(t)]) - 1 for t in b["t"]]
+        clim = torch.nan_to_num(torch.tensor(stats["clim"][doy], device=DEV))
+        Ts.append((unpad(mu.mean(0) * std) + clim).cpu().numpy())
+        Ss.append(unpad(var.sqrt() * std).cpu().numpy())
+        times += [ds.time[int(t)] for t in b["t"]]
+    src = f"OceanEmbed ({len(models)}-model ensemble) from surface satellite observations only"
+    return _to_dataset(np.concatenate(Ts), np.concatenate(Ss), times, stats, src)
+
+
+def reconstruct_baseline(predictor, inputs_path, stats, start, end, window):
+    """Same output format for a non-neural predictor (baselines.Climatology / baselines.Ridge)."""
+    ds = SurfaceWindows(inputs_path, None, stats, (start, end), window=window, need_target=False)
+    std = stats["depth_std"][:, None, None]
+    Ts, times = [], []
+    for k in range(len(ds)):
+        it = ds[k]; t = ds.idx[k]
+        Ts.append(stats["clim"][ds.doy[t] - 1] + predictor.predict(it) * std)
+        times.append(ds.time[t])
+    return _to_dataset(np.stack(Ts), None, times, stats, predictor.name)
 
 
 def _round(a, nd=2):
