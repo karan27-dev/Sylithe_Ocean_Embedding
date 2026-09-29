@@ -80,12 +80,12 @@ function Framer({ region, padding }) {
  *  region     'NIO' | 'BoB' | 'AS' — framed with a fly-to
  */
 export default function OceanMap({ g, url, grid, probe, onPick, onHover, points, onPoint, region = 'NIO', showRegion = true,
-  padding = [24, 24], zoomControl = true, className = '', children }) {
+  padding = [24, 24], zoomControl = true, scrollZoom = true, className = '', children }) {
   const bounds = gridBounds(g)
   const [ready, setReady] = useState(false)
   return (
     <MapContainer bounds={DOMAIN} minZoom={3} maxZoom={9} zoomSnap={0.25} zoomDelta={0.5} wheelPxPerZoomLevel={120}
-      maxBounds={[[-5, 30], [40, 120]]} zoomControl={false} attributionControl
+      maxBounds={[[-5, 30], [40, 120]]} zoomControl={false} attributionControl scrollWheelZoom={scrollZoom}
       whenReady={() => setReady(true)} className={`h-full w-full ${className}`}>
       <TileLayer url={`${ESRI}/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}`} maxNativeZoom={16}
         attribution="Basemap © Esri" />
