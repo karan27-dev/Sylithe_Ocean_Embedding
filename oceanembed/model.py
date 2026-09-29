@@ -21,6 +21,7 @@ import torch.nn.functional as F
 from .config import DEPTHS, INPUT_VARS
 
 N_STATIC = 5          # ocean mask, lat, lon, sin(doy), cos(doy)
+N_IN = 2 * len(INPUT_VARS)   # raw + day-of-year anomaly per variable (see dataset.py)
 N_DEPTH = len(DEPTHS)
 
 
@@ -64,7 +65,7 @@ class ConvBlock(nn.Module):
 
 # ------------------------------------------------------------------ embedding engine
 class SurfaceEncoder(nn.Module):
-    def __init__(self, n_vars=len(INPUT_VARS), base=32, levels=4, embed_dim=64):
+    def __init__(self, n_vars=N_IN, base=32, levels=4, embed_dim=64):
         super().__init__()
         self.stem = nn.Sequential(
             nn.Conv3d(n_vars * 2, base, 3, padding=1), nn.GELU(),          # values + missing-flags
@@ -154,7 +155,7 @@ class AttnUNetPP3D(nn.Module):
     def __init__(self, base=16, levels=4, window=15):
         super().__init__()
         chs = [base * 2 ** i for i in range(levels)]
-        self.inp = ConvBlock(len(INPUT_VARS) * 2 + N_STATIC, chs[0], dims=3)
+        self.inp = ConvBlock(N_IN * 2 + N_STATIC, chs[0], dims=3)
         self.downs = nn.ModuleList([ConvBlock(chs[i - 1], chs[i], dims=3) for i in range(1, levels)])
         self.decoder = NestedDecoder(chs, 2, dims=3, pool=(1, 2, 2))
         self.t2d = nn.Linear(window, N_DEPTH) if window != N_DEPTH else nn.Identity()

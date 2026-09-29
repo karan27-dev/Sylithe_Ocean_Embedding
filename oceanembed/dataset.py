@@ -3,6 +3,10 @@
 Target = temperature anomaly from a smoothed day-of-year GLORYS climatology, divided by a per-depth
 std. The network learns the (hard) perturbation; the climatology carries the (easy) background —
 the same "background → perturbation" idea the ESSD-2026 paper gets from transfer learning.
+
+Inputs are given twice: normalised raw fields (absolute state, e.g. how warm the mixed layer is) and
+normalised day-of-year anomalies (the perturbation that drives subsurface anomalies). All climatologies
+and statistics come from the training years only, so nothing leaks from validation/test.
 """
 from __future__ import annotations
 
@@ -16,41 +20,61 @@ from . import config as C
 from .model import N_STATIC
 
 
+N_VARS = len(C.INPUT_VARS)
+N_IN = 2 * N_VARS                     # raw + anomaly channel per variable
+
+
 # ------------------------------------------------------------------ statistics (train period only)
+def _doy_climatology(da: xr.DataArray, smooth_days: int) -> np.ndarray:
+    """Day-of-year mean with all 366 slots filled and a circular running mean. Returns (366, ...) float32."""
+    clim = da.groupby("time.dayofyear").mean("time").compute()
+    present = clim.dayofyear.values
+    clim = clim.reindex(dayofyear=np.arange(1, 367))
+    nearest = present[np.abs(np.arange(1, 367)[:, None] - present[None]).argmin(1)]   # empty slot → nearest day
+    clim = clim.copy(data=clim.sel(dayofyear=nearest).values)
+    k = smooth_days // 2
+    ext = xr.concat([clim.isel(dayofyear=slice(-k, None)), clim, clim.isel(dayofyear=slice(0, k))], "dayofyear")
+    return ext.rolling(dayofyear=smooth_days, center=True).mean().isel(dayofyear=slice(k, k + 366)).values.astype("f4")
+
+
 def compute_stats(inputs_path, target_path, out_path, smooth_days=31):
     ds_in = xr.open_zarr(inputs_path).sel(time=slice(*C.TRAIN))
     T = xr.open_zarr(target_path)["thetao"].sel(time=slice(*C.TRAIN))
     ocean_da = T.isel(time=0, depth=0).notnull().compute()        # GLORYS sea mask (winds/SST also cover land/lakes)
     stats = {}
+    inclim = []
     for v in C.INPUT_VARS:
         a = ds_in[v].where(ocean_da.values)
         stats[f"{v}_mean"] = float(a.mean(skipna=True).compute())
         stats[f"{v}_std"] = float(a.std(skipna=True).compute()) or 1.0
+        c = _doy_climatology(a, smooth_days)                                     # (366, H, W)
+        sub = a.isel(time=slice(0, None, 7)).compute()
+        stats[f"{v}_astd"] = float(np.nanstd(sub.values - c[sub["time.dayofyear"].values - 1])) or 1.0
+        inclim.append(c)
 
-    clim = T.groupby("time.dayofyear").mean("time").compute()
-    # guarantee all 366 slots so clim[doy-1] is always the right day (doy 366 only exists in leap years)
-    present = clim.dayofyear.values
-    clim = clim.reindex(dayofyear=np.arange(1, 367))                                  # (366, 15, H, W)
-    nearest = present[np.abs(np.arange(1, 367)[:, None] - present[None]).argmin(1)]   # empty slot → nearest day
-    clim = clim.copy(data=clim.sel(dayofyear=nearest).values)
-    k = smooth_days // 2                                                       # circular running mean
-    ext = xr.concat([clim.isel(dayofyear=slice(-k, None)), clim, clim.isel(dayofyear=slice(0, k))], "dayofyear")
-    clim = ext.rolling(dayofyear=smooth_days, center=True).mean().isel(dayofyear=slice(k, k + 366))
-    clim_np = clim.values.astype("f4")
+    clim_np = _doy_climatology(T, smooth_days)                                   # (366, 15, H, W)
     # per-depth std of the anomaly, subsampled in time to keep it cheap
     sub = T.isel(time=slice(0, None, 7)).compute()
     anom = sub.values - clim_np[sub["time.dayofyear"].values - 1]
     # floor: deep anomalies are tiny, and dividing by ~0 would explode the normalised target
     depth_std = np.maximum(np.nanstd(anom, axis=(0, 2, 3)), 0.05).astype("f4")
     ocean = np.isfinite(clim_np[0, 0]).astype("f4")
-    np.savez_compressed(out_path, clim=clim_np, depth_std=depth_std, ocean=ocean,
+    np.savez_compressed(out_path, clim=clim_np, depth_std=depth_std, ocean=ocean, inclim=np.stack(inclim),
                         **{k: np.float32(v) for k, v in stats.items()})
     return out_path
 
 
 def load_stats(path):
     z = np.load(path)
+    if "inclim" not in z.files:
+        raise ValueError(f"{path} predates the anomaly inputs: delete it and re-run compute_stats")
     return {k: z[k] for k in z.files}
+
+
+def worker_init(worker_id):
+    """Give every DataLoader worker its own numpy seed. Forked workers otherwise share one RNG state and
+    apply identical random masks, which silently weakens the augmentation."""
+    np.random.seed((torch.initial_seed() + worker_id) % 2 ** 32)
 
 
 # ------------------------------------------------------------------ helpers
@@ -68,8 +92,8 @@ def static_channels(ocean, doy):
 
 
 class SurfaceWindows(Dataset):
-    """Items: x (V,T,H,W), missing (V,T,H,W), static (5,H,W), y (15,H,W), m (15,H,W), plus physical
-    helpers (clim, sst at t). All spatial arrays padded to (PAD_H, PAD_W)."""
+    """Items: x (2V,T,H,W) = [raw, anomaly], missing (2V,T,H,W), static (5,H,W), y (15,H,W), m (15,H,W),
+    plus physical helpers (clim, sst at t). All spatial arrays padded to (PAD_H, PAD_W)."""
 
     def __init__(self, inputs_path, target_path, stats, period, window=C.TrainConfig.window,
                  train=False, var_dropout=0.0, patch_mask=0.0, need_target=True):
@@ -91,6 +115,16 @@ class SurfaceWindows(Dataset):
         t1 = int(self.time.searchsorted(pd.Timestamp(period[1]), side="right")) - 1
         self.idx = [t for t in range(t0, t1 + 1) if t - window + 1 >= 0]
         self.ocean = stats["ocean"]
+        self.doy = np.minimum(self.time.dayofyear.values, 366)
+        self.mean = np.array([stats[f"{v}_mean"] for v in C.INPUT_VARS], "f4")[:, None, None, None]
+        self.std = np.array([stats[f"{v}_std"] for v in C.INPUT_VARS], "f4")[:, None, None, None]
+        self.astd = np.array([stats[f"{v}_astd"] for v in C.INPUT_VARS], "f4")[:, None, None, None]
+
+    def _anomalies(self, raw, t):
+        """(V, T, H, W) normalised raw → normalised day-of-year anomalies for the same window."""
+        doys = self.doy[t - self.window + 1: t + 1] - 1
+        clim = self.S["inclim"][:, doys]                                    # (V, T, H, W)
+        return ((raw * self.std + self.mean) - clim) / self.astd
 
     def __len__(self):
         return len(self.idx)
@@ -99,15 +133,16 @@ class SurfaceWindows(Dataset):
         t = self.idx[k]
         day = self.time[t]
         doy = min(day.dayofyear, 366)
-        x = self.inp[:, t - self.window + 1: t + 1].astype("f4")            # (V, T, H, W)
+        raw = self.inp[:, t - self.window + 1: t + 1].astype("f4")          # (V, T, H, W)
+        x = np.concatenate([raw, self._anomalies(raw, t)])                   # (2V, T, H, W)
         miss = ~np.isfinite(x)
         if self.train and self.var_dropout > 0:
             for i, v in enumerate(C.INPUT_VARS):
                 if v in C.DROPPABLE_VARS and np.random.rand() < self.var_dropout:
-                    miss[i] = True
+                    miss[i] = miss[i + N_VARS] = True                   # drop raw and anomaly together
         target_surface = None
         if self.patch_mask > 0:                                              # SSL: hide 16×16 patches
-            target_surface = np.nan_to_num(x[:, -1].copy())
+            target_surface = np.nan_to_num(x[:N_VARS, -1].copy())              # reconstruct the raw fields
             ph, pw = len(C.LATS) // 16 + 1, len(C.LONS) // 16 + 1
             pm = np.random.rand(ph, pw) < self.patch_mask
             pm = np.kron(pm, np.ones((16, 16), bool))[: len(C.LATS), : len(C.LONS)]
@@ -122,7 +157,7 @@ class SurfaceWindows(Dataset):
         item["sst"] = _pad(np.where(miss[0, -1], np.nan, sst_phys).astype("f4"), np.nan)
         if target_surface is not None:
             item["surface"] = _pad(target_surface)
-            item["surface_mask"] = _pad((pm[None] & (self.ocean > 0)).repeat(len(C.INPUT_VARS), 0).astype("f4"))
+            item["surface_mask"] = _pad((pm[None] & (self.ocean > 0)).repeat(N_VARS, 0).astype("f4"))
         if self.T is not None:
             clim = self.S["clim"][doy - 1]
             Tt = self.T.isel(time=t).values.astype("f4")
