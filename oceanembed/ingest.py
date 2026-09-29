@@ -404,7 +404,33 @@ def _level_to_grid(level: xr.DataArray, M) -> np.ndarray:
     return lv.reindex(lat=C.LATS, lon=C.LONS, method="nearest", tolerance=1e-3).values
 
 
-def ingest_target(root: str, product: str | None = None, band_rows: int = 16, dask_threads: int = 8,
+def _release_memory():
+    """Give freed numpy buffers back to the OS. Without this, RSS stayed at ~8 GB between windows on Colab
+    (glibc keeps freed arenas), so the next window stacked on top of it."""
+    import ctypes
+    import gc
+    gc.collect()
+    try:
+        ctypes.CDLL("libc.so.6").malloc_trim(0)
+    except OSError:
+        pass                                   # not glibc (e.g. macOS): nothing to trim
+
+
+def _encode_t(a: np.ndarray) -> np.ndarray:
+    """float °C → the store's int16 encoding (0.001 °C steps, offset 20, NaN → fill)."""
+    out = np.full(a.shape, T_ENCODING["_FillValue"], dtype=np.int16)
+    ok = np.isfinite(a)
+    out[ok] = np.clip(np.rint((a[ok] - T_ENCODING["add_offset"]) / T_ENCODING["scale_factor"]), -32767, 32767)
+    return out
+
+
+def _decode_t(a: np.ndarray) -> np.ndarray:
+    out = a.astype(np.float32) * np.float32(T_ENCODING["scale_factor"]) + np.float32(T_ENCODING["add_offset"])
+    out[a == T_ENCODING["_FillValue"]] = np.nan
+    return out
+
+
+def ingest_target(root: str, product: str | None = None, band_rows: int = 16, dask_threads: int = 4,
                   write_days: int = 128, log=print):
     """Target reanalysis → target.zarr via the arco-time-series layout.
 
@@ -440,7 +466,8 @@ def ingest_target(root: str, product: str | None = None, band_rows: int = 16, da
             key = f"{product}:{t_all[i0].date()}"
             if key in done:
                 continue
-            out = np.full((i1 - i0, len(C.DEPTHS), len(C.LATS), len(C.LONS)), np.nan, dtype=np.float32)
+            # held in the store's own int16 encoding: half the RAM of float32, no loss (store rounds to 0.001 °C)
+            out = np.full((i1 - i0, len(C.DEPTHS), len(C.LATS), len(C.LONS)), T_ENCODING["_FillValue"], dtype=np.int16)
             for r0, r1 in bands:
                 lo, hi = C.LATS[r0] - C.RES / 2, C.LATS[r1 - 1] + C.RES / 2
                 sub = da.isel(time=slice(i0, i1)).sel(lat=slice(lo, hi))
@@ -455,16 +482,18 @@ def ingest_target(root: str, product: str | None = None, band_rows: int = 16, da
                             cache[k] = _level_to_grid(sub.isel(depth=k), M)
                     for k in [k for k in cache if k < k0]:
                         del cache[k]                                  # keep at most the two levels in use
-                    out[:, ti, r0:r1] = (cache[k0][:, r0:r1] * np.float32(1 - w) + cache[k1][:, r0:r1] * np.float32(w))
+                    out[:, ti, r0:r1] = _encode_t(cache[k0][:, r0:r1] * np.float32(1 - w) + cache[k1][:, r0:r1] * np.float32(w))
                 del cache
+                _release_memory()
                 log(f"  {t_all[i0].date()}–{t_all[i1 - 1].date()}  lat band {C.LATS[r0]:.2f}–{C.LATS[r1 - 1]:.2f}°N done{_ram()}")
             times = t_all[i0:i1]
             for j in range(0, i1 - i0, write_days):                  # small writes: int16 encoding upcasts in memory
-                blk = xr.DataArray(out[j:j + write_days], dims=["time", "depth", "lat", "lon"],
+                blk = xr.DataArray(_decode_t(out[j:j + write_days]), dims=["time", "depth", "lat", "lon"],
                                    coords={"time": times[j:j + write_days], "depth": np.array(C.DEPTHS, float),
                                            "lat": C.LATS, "lon": C.LONS})
                 write_block(path, blk, "thetao")
             del out
+            _release_memory()
             _mark(path, key)
             log(f"ok target window {t_all[i0].date()}–{t_all[i1 - 1].date()}{_ram()}")
     log("target done")
