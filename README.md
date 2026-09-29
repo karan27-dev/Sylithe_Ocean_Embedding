@@ -27,3 +27,49 @@ oceanembed/   Python package: config, regrid, ingest, dataset, model, losses, tr
 colab/        three notebooks (regenerate with python colab/_build_notebooks.py)
 web/          React + Leaflet + Recharts console, Sylithe design tokens
 ```
+
+## Train on RunPod (or any CUDA machine)
+
+Everything in notebooks 02–03, as one resumable command. Data comes straight from your Google Drive.
+
+**1 · Make the data archive (once, in Colab after notebook 01).** One big file downloads in minutes; the
+~55,000 small Zarr files would take an hour or more:
+```python
+!tar -cf {ROOT}/cache_inputs_target.tar.part -C /content inputs.zarr target.zarr && mv {ROOT}/cache_inputs_target.tar.part {ROOT}/cache_inputs_target.tar
+```
+
+**2 · Create the pod.** PyTorch template, one GPU (RTX 4090 / L40S / A100), a **network volume of ~40 GB mounted at
+`/workspace`** so data and checkpoints survive a stop. Open the pod's terminal.
+
+**3 · Connect rclone to your Google Drive** (you sign in; nobody else sees your token):
+```bash
+curl -fsSL https://rclone.org/install.sh | bash
+rclone config        # n → name: gdrive → storage: drive → client id/secret: blank → scope: 1 (full)
+                     # → service account: blank → edit advanced: n → use web browser: n
+```
+rclone prints a command like `rclone authorize "drive" "…"`. Run that on your **laptop** (`brew install rclone`),
+sign in to Google there, and paste the token it prints back into the pod. Finish with `n` (not a team drive) and `y`.
+
+**4 · Code + data:**
+```bash
+cd /workspace && git clone https://github.com/karan27-dev/Sylithe_Ocean_Embedding && cd Sylithe_Ocean_Embedding
+bash scripts/runpod_setup.sh
+```
+
+**5 · Train and score everything within a budget:**
+```bash
+nohup python -m oceanembed.run all --data /workspace/data --root /workspace/OceanEmbed \
+      --hours 6 --seeds 42 7 1234 --batch 16 --workers 8 > /workspace/run.log 2>&1 &
+tail -f /workspace/run.log
+```
+`--hours` is GPU time for training, split 15 % embedding engine / 55 % OceanEmbed seeds / 25 % published method.
+Each stage's learning rate anneals inside its share, so a budget stop still ends on a converged model. Leave
+~1.5 h on top for setup, statistics and the leaderboard: with **$10** at a pod price of **P $/h**, use
+`--hours ≈ 10 / P − 1.5`. If the pod stops, re-run the same command: it resumes.
+
+**6 · Results back to Drive** (small):
+```bash
+rclone copy -P /workspace/OceanEmbed gdrive:OceanEmbed/runpod_results --exclude "*_last.pt"
+```
+Leaderboard: `/workspace/OceanEmbed/leaderboard/leaderboard.md`; product: `OceanEmbed_NIO_T_2023.nc`.
+**Stop the pod when finished** (billing continues while it runs).
