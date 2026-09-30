@@ -222,7 +222,8 @@ export default function Copilot() {
             {log.map((e, i) => (
               <div key={i} className="rise-in">
                 <p className="label mb-1">{e.who}</p>
-                <p className={`whitespace-pre-line text-[13.5px] leading-relaxed ${e.who === 'you' ? 'text-ink' : 'text-ink2'} ${e.pending ? 'animate-pulse' : ''}`}>{e.text}</p>
+                <p className={`whitespace-pre-line text-[13.5px] leading-relaxed ${e.who === 'you' ? 'text-ink' : 'text-ink2'} ${e.pending ? 'animate-pulse' : ''}`}>
+                  {e.text.split(/(\*\*[^*]+\*\*)/).map((seg, j) => (seg.startsWith('**') && seg.endsWith('**') ? <b key={j} className="font-medium text-ink">{seg.slice(2, -2)}</b> : seg))}</p>
               </div>
             ))}
             <div ref={end} />
