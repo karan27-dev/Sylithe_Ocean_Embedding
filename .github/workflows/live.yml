@@ -1,0 +1,78 @@
+# Live Sylithe Ocean Model: whenever the satellites publish new surface data, predict the ocean beneath it.
+# Runs four times a day; a run with nothing new to do finishes in a few minutes. State and the console's
+# live data live on the `live-data` branch (one commit, replaced each run, so history does not grow).
+#
+# One-time setup: repository secrets CMEMS_USER and CMEMS_PASS (Copernicus Marine login), and a release
+# tagged `models-v1` with seed42.pt, seed7.pt, seed1234.pt and stats_v2.npz (see docs/LIVE.md).
+name: live
+
+on:
+  schedule:
+    - cron: "15 0,6,12,18 * * *"     # 05:45, 11:45, 17:45, 23:45 IST
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: live
+  cancel-in-progress: false
+
+jobs:
+  predict:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-live.txt
+
+      - name: Install (CPU PyTorch)
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements-live.txt
+
+      - name: Trained models (cached per release)
+        id: models
+        uses: actions/cache@v4
+        with:
+          path: models
+          key: models-v1
+
+      - name: Download models from the release
+        if: steps.models.outputs.cache-hit != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download models-v1 --dir dl
+          for s in 42 7 1234; do mkdir -p models/seed$s && mv dl/seed$s.pt models/seed$s/glorys_best.pt; done
+          mv dl/stats_v2.npz models/stats_v2.npz
+
+      - name: Previous state
+        run: |
+          if git ls-remote --exit-code origin live-data >/dev/null; then
+            git fetch --depth 1 origin live-data
+            mkdir state && git --work-tree=state checkout FETCH_HEAD -- . && git reset -q
+          else
+            mkdir state
+          fi
+
+      - name: Ingest new satellite days and predict
+        env:
+          COPERNICUSMARINE_SERVICE_USERNAME: ${{ secrets.CMEMS_USER }}
+          COPERNICUSMARINE_SERVICE_PASSWORD: ${{ secrets.CMEMS_PASS }}
+        run: python -m oceanembed.live run --state state --models models
+
+      - name: Publish to the live-data branch
+        run: |
+          cd state
+          git init -q -b live-data
+          git config user.name "sylithe-live[bot]"
+          git config user.email "sylithe-live@users.noreply.github.com"
+          git add -A
+          git commit -q -m "live update $(date -u +%FT%TZ)"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" live-data
