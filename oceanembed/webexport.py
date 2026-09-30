@@ -213,13 +213,14 @@ def embeddings(model, inputs_path, stats, start, end, window, batch=4):
     """Latent maps z (days, 64, h, w) from the first ensemble member's encoder, one per day in [start, end]."""
     import torch
     from .dataset import SurfaceWindows
-    from .train import DEV
+    from .train import DEV, _to
     ds = SurfaceWindows(inputs_path, None, stats, (start, end), window=window, need_target=False)
     model.to(DEV).eval()
     zs, times = [], []
     with torch.no_grad():
         for b in torch.utils.data.DataLoader(ds, batch):
-            _, _, z = model(b["x"].to(DEV), b["missing"].to(DEV), b["static"].to(DEV))
+            b = _to(b)                                   # compact float16 / uint8 batches → float32 on device
+            _, _, z = model(b["x"], b["missing"], b["static"])
             if z is None:
                 raise ValueError("this architecture has no embedding head (use an OceanEmbedNet checkpoint)")
             zs.append(z.float().cpu().numpy())
