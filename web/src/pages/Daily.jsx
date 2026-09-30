@@ -113,7 +113,7 @@ const INPUTS = [
 
 
 export default function Daily() {
-  const [mode, setMode] = useState('live')
+  const mode = 'live'
   const liveM = useManifest(LIVE)
   const liveDown = mode === 'live' && liveM.error
   const OPS = mode === 'live' && !liveDown ? LIVE : REPLAY
@@ -176,11 +176,9 @@ export default function Daily() {
   const url = useMemo(() => grid && renderGrid(ops.grid, grid, L_.ramp, crange), [grid, crange]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const modeSwitch = (
-    <div className="seg" role="group" aria-label="Mode">
-      <button aria-pressed={mode === 'live'} onClick={() => { setMode('live'); setDate(null); setProbe(null) }}>
-        <span className={`mr-1.5 inline-block h-[7px] w-[7px] rounded-full ${liveDown ? 'bg-line2' : 'bg-heat animate-pulse'} align-middle`} />Live</button>
-      <button aria-pressed={mode === 'replay'} onClick={() => { setMode('replay'); setDate(null); setProbe(null) }}>2023 replay</button>
-    </div>
+    <span className="inline-flex h-8 items-center gap-2 rounded-[8px] bg-ink px-3 text-[12.5px] text-paper">
+      <span className={`inline-block h-[7px] w-[7px] rounded-full ${liveDown ? 'bg-line2' : 'bg-[#A3E635] animate-pulse'}`} />{liveDown ? 'Offline · 2023 data' : 'Live'}
+    </span>
   )
   if (!series || !date) {
     return <div className="page pt-16"><SectionHead as="h1" label="Daily forecast" title="Loading the daily pipeline…" /><div className="mt-6">{modeSwitch}</div></div>
