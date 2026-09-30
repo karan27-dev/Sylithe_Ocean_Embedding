@@ -129,9 +129,9 @@ export default function Research() {
               {board?.rows.map((r) => {
                 const ours = r.Type === 'ours'
                 return (
-                  <tr key={r.Method} className={`border-b border-line ${ours ? 'bg-seatint/60' : ''}`}>
-                    <td className="py-2.5 pr-4"><span className={ours ? 'text-ink' : 'text-ink2'}>{r.Method}</span>
-                      <span className="ml-2 text-[11px] text-faint">{r.Type}</span></td>
+                  <tr key={r.Method} className={`border-b border-line ${ours ? 'bg-[#A3E635]/20 shadow-[inset_3px_0_0_#65A30D]' : ''}`}>
+                    <td className="py-2.5 pl-3 pr-4"><span className={ours ? 'font-medium text-ink' : 'text-ink2'}>{r.Method}</span>
+                      {ours ? <span className="ml-2 rounded-full bg-ink px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-[#A3E635]">Ours</span> : <span className="ml-2 text-[11px] text-faint">{r.Type}</span>}</td>
                     {cols.map((c) => {
                       const v = r[c]
                       const isBest = v != null && !r.Method.startsWith('GLORYS') && (c.includes('bias') ? Math.abs(v) : v) === best[c]

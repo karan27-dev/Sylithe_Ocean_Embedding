@@ -167,7 +167,7 @@ const CHANNELS = [
 export default function Model() {
   const lb = useJSON('leaderboard.json')
   const rows = lb?.rows ?? []
-  const best = Math.min(...rows.map((r) => r['RMSE vs Argo (°C)']).filter(Number.isFinite))
+  const best = Math.min(...rows.filter((r) => !/reference/.test(r.Type)).map((r) => r['RMSE vs Argo (°C)']).filter(Number.isFinite))
   return (
     <div className="pb-8">
       <div className="page pt-12 sm:pt-16">
@@ -245,16 +245,16 @@ export default function Model() {
         <div className="mt-6 overflow-x-auto">
           <table className="w-full min-w-[820px] text-[13px]">
             <thead><tr className="border-b border-line text-left">
-              {['Method', 'Type', 'vs GLORYS', 'vs Argo', 'Argo 0–200 m', 'Argo 200–1000 m', 'Bay of Bengal', 'Arabian Sea', 'Bias'].map((h) => <th key={h} className="label py-2 pr-4 font-normal">{h}</th>)}</tr></thead>
+              {['Method', 'Type', 'vs GLORYS', 'vs Argo', 'Argo 0–200 m', 'Argo 200–1000 m', 'Bay of Bengal', 'Arabian Sea', 'Bias'].map((h, i) => <th key={h} className={`label py-2 pr-4 font-normal ${i ? '' : 'pl-3'}`}>{h}</th>)}</tr></thead>
             <tbody>{rows.map((r) => {
               const ours = r.Type === 'ours'
               const v = (k) => (r[k] == null ? '—' : r[k].toFixed(3))
               return (
-                <tr key={r.Method} className={`border-b border-line ${ours ? 'bg-seatint/50' : ''}`}>
-                  <td className={`py-2.5 pr-4 ${ours ? 'text-ink' : 'text-ink2'}`}>{r.Method}</td>
+                <tr key={r.Method} className={`border-b border-line ${ours ? 'bg-[#A3E635]/20 shadow-[inset_3px_0_0_#65A30D]' : ''}`}>
+                  <td className={`py-2.5 pl-3 pr-4 ${ours ? 'font-medium text-ink' : 'text-ink2'}`}>{r.Method}{ours && <span className="ml-2 rounded-full bg-ink px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-[#A3E635]">Ours</span>}</td>
                   <td className="py-2.5 pr-4 text-mute">{r.Type}</td>
                   <td className="num py-2.5 pr-4">{v('RMSE vs GLORYS (°C)')}</td>
-                  <td className={`num py-2.5 pr-4 ${r['RMSE vs Argo (°C)'] === best ? 'text-sea' : ''}`}>{v('RMSE vs Argo (°C)')}</td>
+                  <td className={`num py-2.5 pr-4 ${r['RMSE vs Argo (°C)'] === best ? 'font-medium text-sea' : ''}`}>{v('RMSE vs Argo (°C)')}</td>
                   <td className="num py-2.5 pr-4">{v('Argo 0–200 m')}</td><td className="num py-2.5 pr-4">{v('Argo 200–1000 m')}</td>
                   <td className="num py-2.5 pr-4">{v('Argo Bay of Bengal')}</td><td className="num py-2.5 pr-4">{v('Argo Arabian Sea')}</td>
                   <td className="num py-2.5 pr-4 text-mute">{r['Argo bias (°C)'] >= 0 ? '+' : ''}{v('Argo bias (°C)')}</td>
