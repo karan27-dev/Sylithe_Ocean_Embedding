@@ -22,6 +22,12 @@ Smart India Hackathon 2026 · Problem Statement **26066** · Ministry of Earth S
 
 ![Daily forecast console](docs/img/daily.jpg)
 
+<sub><b>Daily forecast</b> — the live prediction for the whole North Indian Ocean: temperature at any depth from 0 to 1000 m, with today's SST, 100 m temperature, cyclone heat potential and D26 against the start of the chosen range.</sub>
+
+![Benchmark: skill over climatology and leaderboard](docs/img/leaderboard.jpg)
+
+<sub><b>Validation</b> — skill over climatology and the leaderboard on the 2023 test year, scored against 9,469 independent Argo measurements. \* marks this work.</sub>
+
 ---
 
 ## At a glance
