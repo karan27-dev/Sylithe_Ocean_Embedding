@@ -1,6 +1,6 @@
 import { SectionHead } from '../components/ui'
 
-// Architecture as implemented in oceanembed/model.py (Sylithe Ocean ModelNet): 3-D stem + temporal attention, a CBAM encoder
+// Architecture as implemented in oceanembed/model.py (Sylithe Ocean Model): 3-D stem + temporal attention, a CBAM encoder
 // whose deepest level gives the embedding, and a U-Net++ nested decoder with deep supervision.
 const L = 4, DX = 92, DY = 62, X0 = 440, Y0 = 52
 const node = (i, j) => [X0 + j * DX, Y0 + i * DY]
@@ -12,7 +12,7 @@ function Diagram() {
   const W = 1000, H = 330
   const box = (x, y, w, h, props = {}) => <rect x={x - w / 2} y={y - h / 2} width={w} height={h} rx="3" {...props} />
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="block w-full min-w-[860px]" role="img" aria-label="Sylithe Ocean ModelNet architecture">
+    <svg viewBox={`0 0 ${W} ${H}`} className="block w-full min-w-[860px]" role="img" aria-label="Sylithe Ocean Model architecture">
       <defs>
         <marker id="ar" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto">
           <path d="M0 0L8 4L0 8z" fill="rgb(var(--mute))" />
@@ -81,7 +81,7 @@ function Diagram() {
 
 const STAGES = [
   ['Stage 0', 'Embedding engine', 'Masked autoencoder on the surface inputs only. Half of the 16 × 16 patches in the last three days are hidden, and whole variables are dropped. No subsurface labels.', 'encoder weights, the embedding'],
-  ['Stage 1', 'Argo background', 'Monthly inputs against INCOIS gridded Argo. Anchors the network to observed stratification and the seasonal cycle before it sees a reanalysis.', 'observation-anchored start'],
+  ['Stage 1 · optional', 'Argo background', 'Monthly inputs against INCOIS gridded Argo, to anchor the network to observed stratification before it sees a reanalysis (Wang et al. 2026). Built and supported, but not used in this run: the gridded Argo export was not available, so training went from stage 0 straight to stage 2.', 'not used in the reported results'],
   ['Stage 2', 'GLORYS fine-tune', 'Daily inputs against GLORYS12 at 15 depths, every layer trainable: the strategy that transferred best in Wang et al. (2026). Several seeds are trained and averaged.', 'the ensemble'],
 ]
 const LOSSES = [
@@ -116,7 +116,7 @@ export default function Model() {
   return (
     <div className="pb-8">
       <div className="page pt-12 sm:pt-16">
-        <SectionHead as="h1" label="Model · Sylithe Ocean ModelNet" title="From a surface window to a temperature column">
+        <SectionHead as="h1" label="Model · Sylithe Ocean Model" title="From a surface window to a temperature column">
           The network reads fifteen days of fourteen surface channels, the seven observed variables and their day-of-year
           anomalies, and predicts, for every ocean cell, a mean and an uncertainty at fifteen depths. It predicts anomalies from a
           climatology, so the seasonal stratification comes for free and the capacity goes to eddies, Kelvin and Rossby waves and
