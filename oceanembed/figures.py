@@ -12,6 +12,7 @@ import json
 import os
 
 import matplotlib
+import matplotlib.dates  # noqa: F401
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
@@ -289,24 +290,28 @@ class Figs:
         z = np.load(p)
         days = list(z["days"])
         picks = [d for d in ["2023-05-08", "2023-05-16"] if d in days] or [days[0], days[-1]]
-        fig = plt.figure(figsize=(9.4, 5.6))
-        gs = fig.add_gridspec(2, len(picks) + 1, width_ratios=[1] * len(picks) + [1.1])
+        fig = plt.figure(figsize=(12, 6.2), layout="constrained")
+        gs = fig.add_gridspec(2, len(picks) + 1, width_ratios=[1] * len(picks) + [1.25])
         vmax = np.nanpercentile(z["truth_tchp"], 99)
+        maps = []
         for j, d in enumerate(picks):
             i = days.index(d)
             for r, (tag, lab) in enumerate([("truth", "GLORYS12"), ("ours", "Sylithe Ocean Model")]):
                 ax = fig.add_subplot(gs[r, j])
-                im = self._map(ax, z[f"{tag}_tchp"][i], CMAP_HEAT, 0, vmax, title=f"{lab} · {d}")
+                im = self._map(ax, z[f"{tag}_tchp"][i], CMAP_HEAT, 0, vmax, title=f"{lab}\n{d}")
                 ax.set_xlim(78, 100); ax.set_ylim(5, 24)
-        fig.colorbar(im, ax=fig.axes, shrink=0.6, pad=0.01, label="TCHP (kJ cm⁻²)", location="left")
+                maps.append(ax)
+        fig.colorbar(im, ax=maps, shrink=0.8, label="TCHP (kJ cm⁻²)", location="bottom", aspect=40)
         ax = fig.add_subplot(gs[:, -1])
         dd = pd.to_datetime(days)
         ax.plot(dd, z["truth_tchp_bob_mean"], label="GLORYS12", **{k: v for k, v in style("glorys").items() if k != "zorder"})
-        ax.plot(dd, z["ours_tchp_bob_mean"], label="Sylithe Ocean Model", **{k: v for k, v in style("oceanembed").items() if k != "zorder"})
+        ax.plot(dd, z["ours_tchp_bob_mean"], label="Sylithe Ocean Model", **{k: v for k, v in style("sylithe").items() if k != "zorder"})
         if dd[0] <= pd.Timestamp("2023-05-11") and dd[-1] >= pd.Timestamp("2023-05-14"):
             ax.axvspan(pd.Timestamp("2023-05-11"), pd.Timestamp("2023-05-14"), color="#fde68a", alpha=0.6, lw=0, label="Mocha active")
-        ax.set_ylabel("Bay of Bengal mean TCHP (kJ cm⁻²)"); ax.legend(fontsize=7); ax.tick_params(axis="x", rotation=45)
-        fig.suptitle("Cyclone Mocha (May 2023): ocean heat available to the storm, from satellites only", fontsize=10)
+        ax.set_ylabel("Bay of Bengal mean TCHP (kJ cm⁻²)"); ax.legend(fontsize=8)
+        ax.xaxis.set_major_locator(matplotlib.dates.DayLocator(interval=4))
+        ax.xaxis.set_major_formatter(matplotlib.dates.DateFormatter("%d %b"))
+        fig.suptitle("Cyclone Mocha (May 2023): ocean heat available to the storm, from satellites only", fontsize=11)
         self.save(fig, "fig11_mocha_tchp")
 
     def regions(self):
