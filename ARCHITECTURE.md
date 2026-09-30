@@ -203,30 +203,30 @@ stays temporally independent, but it is not independent of the Argo network as a
 
 ## 6. Web console (web/)
 
-Built in the **Sylithe design language**, with tokens taken from `~/Desktop/sylithe/Frontend`: ink `#0F172A`, paper `#F1F1F1`,
-abyss `#08292F`, trench `#062125`, leaf `#16a34a`, mint `#a4fca1`, lime `#A3E635`, Space Grotesk + DM Mono, white
-`rounded-2xl` cards and uppercase eyebrow labels.
+A static React + Leaflet site that reads the export written by `oceanembed/webexport.py`. It needs no server.
+The design is quiet on purpose: warm paper, charcoal ink, one ocean-teal accent, hairlines instead of cards,
+Newsreader / Geist / Geist Mono type. All colour comes from the data, through cmocean colour maps (Thyng et al. 2016).
 
 | Page | What it does |
 |---|---|
-| **Explorer** | Leaflet map of any layer: temperature at a chosen standard depth, SST input, D26, **TCHP**, D20, MLD, T(0)−SST consistency. Hover readout, legend, BoB/AS PoC boxes. Click to probe: KPI tiles + vertical profile (both seasons overlaid) + zonal section with 20 °C / 26 °C isotherms |
-| **Validation** | Reads `skill.json` from notebook 03: RMSE / bias / r vs Argo per depth for ours, GLORYS and HYCOM. Shows the published benchmark numbers for context |
-| **Pipeline** | Source table with live access status, grid spec, harmonisation steps |
-| **Model** | Architecture, stages, losses, experiment list |
-| **Ocean Copilot** | Drawer: see §7 |
+| **Overview** | The problem and the method; the hero is a real cutaway (SST map over the 15°N section) |
+| **Explorer** | Full-screen map of any layer: temperature, σ, GLORYS, model − GLORYS at a depth, D20 / D26 / TCHP / MLD, T₀ − SST, and the seven inputs. Depth gauge, timeline, region framing. Click to probe: profile with ±σ band, GLORYS and the nearest same-day Argo float, E–W / N–S section, depth–time view, CSV |
+| **Embedding** | Linked triptych: surface state → latent representation (3 PCs of z through OKLab) → subsurface; latent regimes (k-means) with their mean profiles |
+| **Validation** | Skill by depth vs Argo per product and region, float map coloured by error with click-through profiles, error strip plot, σ calibration (68 % / 95 %), table, leaderboard |
+| **Cyclone watch** | TCHP map and 2° hotspots, share of each basin above 50 kJ cm⁻², a template-written printable bulletin |
+| **Pipeline · Model · Data** | Sources and harmonisation; architecture diagram, stages, losses, experiments; output format and downloads |
+| **Ask (`/`)** | A deterministic command line: phrases become the same actions as the controls, answers are computed from the loaded fields |
+
+Data format v2: `manifest.json` plus `days/<date>/<layer>.bin` (int16, rows north→south, per-layer scale/offset; a
+15-level day is 0.73 MB), `argo.json`, `skill_depth.json`, `coverage.json`, `leaderboard.json`. `python -m oceanembed.run web`
+(or notebook 03) writes it from a trained run. Before training, `web/scripts/build_demo_data.py` builds it from the HYCOM
+reference days with a 0.25° Natural Earth land mask and scores them against real Argo profiles (±3 days), and every page says so.
 
 Engineering notes:
-- The data overlay is re-rendered in **Web-Mercator row spacing** before Leaflet stretches it. A plain lat/lon image
-  would drift about 0.3° mid-domain.
-- Colour: temperature uses a lightness-monotonic ramp built from the brand teal → leaf → lime (no rainbow). Depths
-  use a single-hue sequential ramp, heat an orange sequential ramp, and differences a diverging ramp with a neutral gray midpoint.
-- The derived metrics are a JS port of `metrics.py` using exact piecewise-linear integrals.
-- Deep links (`?layer=tchp&date=2024-05-15&probe=88,15`) make demo views shareable.
-- Until the model is trained, the Explorer shows **real HYCOM + OISST fields pulled from your GEE** (15 Jan and
-  15 May 2024), clearly labelled as a reference field. Notebook 03's JSON export uses the same schema, so model
-  output is a drop-in replacement.
-
----
+- Map overlays are resampled to Web-Mercator row spacing before Leaflet stretches them (a plain lat/lon image drifts ~0.3°).
+- Derived metrics are a JS port of `metrics.py` with exact piecewise-linear integrals.
+- Every view is a URL (`/explorer?date=…&layer=…&depth=…&probe=lon,lat&region=…`).
+- Deploy on Vercel with Root Directory `web`.
 
 ## 7. Where an LLM belongs (and where it doesn't)
 

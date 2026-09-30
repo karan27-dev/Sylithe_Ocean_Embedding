@@ -12,7 +12,7 @@ export default function Shell({ children }) {
   const { error } = useData()
   const fullBleed = pathname === '/explorer'
 
-  useEffect(() => setOpen(false), [pathname])
+  useEffect(() => { setOpen(false) }, [pathname])
   useEffect(() => {
     const onKey = (e) => {
       if (e.key === '/' && !/input|textarea/i.test(document.activeElement?.tagName)) { e.preventDefault(); setView({ copilot: true }) }

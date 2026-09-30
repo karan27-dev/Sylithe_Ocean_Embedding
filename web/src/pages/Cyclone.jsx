@@ -100,7 +100,7 @@ export default function Cyclone() {
 
       <section className="mx-auto mt-8 grid w-full max-w-[1480px] gap-8 px-4 sm:px-8 lg:grid-cols-[1fr_380px]">
         <div>
-          <div className="h-[420px] overflow-hidden rounded-[4px] border border-line sm:h-[540px] print:h-[380px]">
+          <div className="h-[300px] overflow-hidden rounded-[4px] border border-line sm:h-[540px] print:h-[380px]">
             <OceanMap g={m.grid} url={url} grid={tchp} scrollZoom={false} padding={[12, 12]}
               points={hs.map((h, n) => ({ id: `h${n}`, lat: h.lat, lon: h.lon, color: '#15181A', r: pick === n ? 8 : 6, stroke: '#F5F3EE', weight: 1.5 }))}
               onPoint={(p) => setPick(+p.id.slice(1))} />

@@ -18,14 +18,25 @@ over the North Indian Ocean from surface observations only. Built for SIH 2026, 
 ```bash
 cd web && npm install && npm run dev
 ```
-Open `http://localhost:5173/?layer=tchp&probe=88,15`. Until a model is trained, the console shows real HYCOM + OISST
-reference fields pulled from Google Earth Engine.
+Open `http://localhost:5173`. Pages: Overview, Explorer, Embedding, Validation, Cyclone watch, Pipeline, Model, Data;
+press `/` for the command line. Every view is a shareable link, e.g.
+`/explorer?date=2024-05-15&layer=tchp&probe=88,15&region=BoB`.
+
+Until a model is trained, the console shows real HYCOM GOFS 3.1 fields (via Google Earth Engine) scored against real
+Argo profiles, and says so on every page. To rebuild that demo data: `PYTHONUTF8=1 python web/scripts/build_demo_data.py`.
+
+**Show the model in the console:** `python -m oceanembed.run web --data … --root …` (or the last cell of notebook 03)
+writes `<root>/web_export/`. Replace the contents of `web/public/data/` with it. Nothing in the code changes: the
+console reads `manifest.json` and enables uncertainty, GLORYS, model − GLORYS, all seven inputs, the learned
+embedding and σ calibration automatically.
+
+**Deploy:** import the repo on Vercel with **Root Directory = `web`** (`web/vercel.json` handles routing and caching).
 
 ## Layout
 ```
-oceanembed/   Python package: config, regrid, ingest, dataset, model, losses, train, metrics, argo, infer
+oceanembed/   Python package: config, regrid, ingest, dataset, model, losses, train, metrics, argo, infer, webexport
 colab/        three notebooks (regenerate with python colab/_build_notebooks.py)
-web/          React + Leaflet + Recharts console, Sylithe design tokens
+web/          React + Leaflet console (custom SVG charts); data format in oceanembed/webexport.py
 ```
 
 ## Train on RunPod (or any CUDA machine)

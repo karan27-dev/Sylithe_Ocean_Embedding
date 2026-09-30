@@ -8,7 +8,7 @@ const probe = (() => {
   const [lon, lat] = (q.get('probe') || '').split(',').map(Number)
   return Number.isFinite(lat) && Number.isFinite(lon) ? { lat, lon } : null
 })()
-const depth = DEPTHS.indexOf(+q.get('depth'))
+const depth = q.has('depth') ? DEPTHS.indexOf(+q.get('depth')) : -1       // +null is 0, a valid depth
 
 export const useView = create((set) => ({
   date: q.get('date') || null,

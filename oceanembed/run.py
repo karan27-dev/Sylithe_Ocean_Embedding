@@ -8,7 +8,8 @@ notebooks, without Colab. Every step is resumable: re-run the same command after
   --hours  GPU time to spend on training; split across stages (see BUDGET) so the whole run fits a
            fixed amount of money, and every stage anneals its learning rate inside its share
 
-Steps: stats → ssl → ours (seed ensemble) → paper (published method) → ridge → leaderboard.
+Steps: stats → ssl → ours (seed ensemble) → paper (published method) → ridge → leaderboard → web.
+`web` writes <root>/web_export/: copy its contents into web/public/data/ and the console shows the model.
 """
 from __future__ import annotations
 
@@ -139,9 +140,30 @@ class Run:
         self.log("leaderboard written to " + os.path.join(self.root, "leaderboard"))
         print(summary.round(3).to_string(index=False))
 
+    def web(self):
+        """Console export (oceanembed/webexport.py): maps for --web-days, Argo scores over the whole test year."""
+        from . import webexport as W
+        self.stats()
+        seeds = sorted(glob.glob(os.path.join(self.ck, "seed*", "glorys_best.pt")))
+        if not seeds:
+            self.log("web: no trained OceanEmbed checkpoints yet, skipped")
+            return
+        members = [TR.load_model(p)[0] for p in seeds]
+        nc = os.path.join(self.root, "OceanEmbed_NIO_T_2023.nc")
+        rec = xr.open_dataset(nc) if os.path.exists(nc) else             I.reconstruct(members, self.inputs, self.S, *C.TEST, window=self.cfg.window)
+        G = xr.open_zarr(self.target).thetao
+        hy = os.path.join(self.data, "hycom.zarr")
+        argo_path = os.path.join(self.data, "argo_2023.parquet")
+        W.export_model(os.path.join(self.root, "web_export"), rec, G, self.inputs, self.S, members, self.cfg.window,
+                       pd.date_range(*self.a.web_days),
+                       profiles=pd.read_parquet(argo_path) if os.path.exists(argo_path) else None,
+                       hycom=xr.open_zarr(hy).thetao if os.path.exists(hy) else None,
+                       leaderboard_json=os.path.join(self.root, "leaderboard", "leaderboard.json"), log=self.log)
+        self.log("console export written to " + os.path.join(self.root, "web_export"))
+
     def all(self):
         t0 = time.time()
-        for step in ["stats", "ssl", "ours", "paper", "ridge", "leaderboard"]:
+        for step in ["stats", "ssl", "ours", "paper", "ridge", "leaderboard", "web"]:
             self.log(f"===== {step} =====")
             getattr(self, step)()
         self.log(f"all done in {(time.time() - t0) / 3600:.1f} h")
@@ -149,7 +171,7 @@ class Run:
 
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("step", choices=["all", "stats", "ssl", "ours", "paper", "ridge", "leaderboard"])
+    p.add_argument("step", choices=["all", "stats", "ssl", "ours", "paper", "ridge", "leaderboard", "web"])
     p.add_argument("--data", required=True)
     p.add_argument("--root", required=True)
     p.add_argument("--hours", type=float, default=None, help="GPU hours for training stages (None = epoch-limited)")
@@ -160,6 +182,8 @@ def main(argv=None):
     p.add_argument("--workers", type=int, default=8)
     p.add_argument("--epochs", type=int, default=C.TrainConfig.epochs_glorys)
     p.add_argument("--epochs-ssl", type=int, default=C.TrainConfig.epochs_ssl)
+    p.add_argument("--web-days", nargs=2, default=["2023-05-01", "2023-05-31"], metavar=("START", "END"),
+                   help="days written as maps for the console (default: the Cyclone Mocha window)")
     a = p.parse_args(argv)
     getattr(Run(a), a.step)()
 

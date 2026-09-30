@@ -312,10 +312,13 @@ inside = [(np.abs(m[f'ours_T{d}'] - m[f'T{d}']) <= m[f'sig_T{d}']).mean() for d 
 pd.Series(inside, index=C.DEPTHS, name='coverage@1σ').round(2)
 '''),
 ("code", r'''
-# Export for the web console → download into OceanEmbed/web/public/data/
+# Export for the web console (format v2, oceanembed/webexport.py): maps for the Cyclone Mocha window,
+# Argo scores, σ calibration and the embedding over the test year. Copy the folder's contents into web/public/data/.
+from oceanembed import webexport as W
 days = pd.date_range('2023-05-01', '2023-05-31')   # pre-monsoon / Cyclone Mocha window
-I.export_web(rec.sel(time=days), f'{ROOT}/web_export', comparison=G.sel(time=days).to_dataset(name='thetao'))
-shutil.copy(f'{ROOT}/leaderboard/leaderboard.json', f'{ROOT}/web_export/leaderboard.json')
+W.export_model(f'{ROOT}/web_export', rec, G, '/content/inputs.zarr', S, members, cfg.window, days, profiles=prof,
+               hycom=xr.open_zarr('/content/hycom.zarr').thetao if os.path.exists('/content/hycom.zarr') else None,
+               leaderboard_json=f'{ROOT}/leaderboard/leaderboard.json')
 '''),
 ]
 

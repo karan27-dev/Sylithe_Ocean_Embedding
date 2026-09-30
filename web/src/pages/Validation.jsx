@@ -76,14 +76,14 @@ export default function Validation() {
 
         {/* headline: one sentence of numbers, not tiles */}
         {overall && (
-          <div className="mt-10 grid border-y border-line sm:grid-cols-4">
+          <div className="mt-10 grid grid-cols-2 border-y border-line sm:grid-cols-4">
             {[
               ['Profiles', n, ''],
               ['Matched values', overall.n, ''],
               [`RMSE, ${styleOf(primary, m).label}`, fmt(overall.rmse, 2), '°C'],
               ['Mean bias', `${overall.bias > 0 ? '+' : ''}${fmt(overall.bias, 2)}`, '°C'],
             ].map(([k, v, u], i) => (
-              <div key={k} className={`py-4 ${i ? 'sm:border-l sm:border-line sm:pl-5' : ''} max-sm:border-b max-sm:border-line`}>
+              <div key={k} className={`py-4 ${i % 2 ? 'border-l border-line pl-4 sm:pl-5' : ''} ${i === 2 ? 'sm:border-l sm:border-line sm:pl-5' : ''} ${i < 2 ? 'max-sm:border-b max-sm:border-line' : ''}`}>
                 <p className="label">{k}</p>
                 <p className="num mt-1.5 text-[24px] leading-none text-ink">{v}<span className="ml-1 text-[12px] text-faint">{u}</span></p>
               </div>
@@ -114,7 +114,7 @@ export default function Validation() {
         lede={`${n} profiles in the ${REGIONS[region].label}. Colour is the profile's RMSE for ${styleOf(primary, m).label} over all depths. Click a float to compare it with the products.`}>
         <div className="grid gap-8 lg:grid-cols-[1.4fr_1fr]">
           <div>
-            <div className="h-[380px] overflow-hidden rounded-[4px] border border-line sm:h-[440px]">
+            <div className="h-[300px] overflow-hidden rounded-[4px] border border-line sm:h-[440px]">
               <OceanMap g={m.grid} url={null} grid={null} points={points} onPoint={setSel} region={region} padding={[12, 12]} scrollZoom={false} />
             </div>
             <div className="mt-3 flex items-center gap-3">

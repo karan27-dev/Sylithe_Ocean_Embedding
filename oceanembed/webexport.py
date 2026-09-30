@@ -206,3 +206,80 @@ def embedding_maps(z: np.ndarray, ocean: np.ndarray, factor: int = 8, k: int = 6
     rgb = np.where(ocean[None, None], rgb, np.nan)
     lab = np.where(ocean[None], lab, np.nan)
     return rgb, lab, basis
+
+
+# ---------------------------------------------------------------- full model export (run.py `web`, notebook 03)
+def embeddings(model, inputs_path, stats, start, end, window, batch=4):
+    """Latent maps z (days, 64, h, w) from the first ensemble member's encoder, one per day in [start, end]."""
+    import torch
+    from .dataset import SurfaceWindows
+    from .train import DEV
+    ds = SurfaceWindows(inputs_path, None, stats, (start, end), window=window, need_target=False)
+    model.to(DEV).eval()
+    zs, times = [], []
+    with torch.no_grad():
+        for b in torch.utils.data.DataLoader(ds, batch):
+            _, _, z = model(b["x"].to(DEV), b["missing"].to(DEV), b["static"].to(DEV))
+            if z is None:
+                raise ValueError("this architecture has no embedding head (use an OceanEmbedNet checkpoint)")
+            zs.append(z.float().cpu().numpy())
+            times += [ds.time[int(t)] for t in b["t"]]
+    return np.concatenate(zs), pd.DatetimeIndex(times)
+
+
+def export_model(out_dir, rec, glorys, inputs_path, stats, models, window, days, profiles=None, hycom=None,
+                 leaderboard_json=None, log=print):
+    """Everything the console reads, from a trained run.
+
+    rec       xr.Dataset from infer.reconstruct (thetao, thetao_sigma) covering at least `days`; for the Argo
+              scores it should cover the whole test year
+    glorys    target DataArray (time, depth, lat, lon); hycom: optional comparator on the same grid
+    days      the days written as maps (e.g. the May 2023 cyclone window); Argo, skill and coverage use all of rec
+    """
+    import shutil
+    import xarray as xr
+    days = pd.DatetimeIndex(days)
+    ex = WebExport(out_dir, "model", "OceanEmbed reconstruction",
+                   f"{len(models)}-model ensemble from surface satellite observations only; test year never seen in training.")
+    ocean = np.asarray(stats["ocean"]) > 0
+    inp = xr.open_zarr(inputs_path)
+
+    log(f"embedding {len(days)} days")
+    z, zt = embeddings(models[0], inputs_path, stats, str(days[0].date()), str(days[-1].date()), window)
+    rgb, lab, _ = embedding_maps(z, ocean)
+    zi = {t: k for k, t in enumerate(zt.normalize())}
+
+    for t in days:
+        day = str(t.date())
+        ex.add(day, "temp", rec.thetao.sel(time=t).values)
+        if "thetao_sigma" in rec:
+            ex.add(day, "sigma", rec.thetao_sigma.sel(time=t).values)
+        ex.add(day, "ref", glorys.sel(time=t).values)
+        for v in C.INPUT_VARS:
+            ex.add(day, v, inp[v].sel(time=t).values)
+        if t in zi:
+            ex.add(day, "embed", rgb[zi[t]])
+            ex.add(day, "cluster", lab[zi[t]])
+    log(f"wrote {len(days)} days of maps")
+
+    products = ["ours", "glorys"] + (["hycom"] if hycom is not None else [])
+    if profiles is not None and len(profiles):
+        fields = {"ours": rec.thetao, "glorys": glorys.sel(time=rec.time), **({"hycom": hycom.sel(time=rec.time)} if hycom is not None else {})}
+        m = profiles
+        for name, f in fields.items():
+            m = A.match(m, f, name)
+        has_sigma = "thetao_sigma" in rec
+        if has_sigma:
+            m = A.match(m, rec.thetao_sigma, "sigma")
+        ex.write_json("argo.json", {"window_days": 0, "profiles": argo_records(m, products, sigma="sigma" if has_sigma else None)})
+        ex.write_json("skill_depth.json", skill_rows(m, products, vs="argo"))
+        if has_sigma:
+            ex.write_json("coverage.json", coverage_rows(m, "ours", "sigma"))
+        log(f"scored {len(m)} Argo profiles")
+    if leaderboard_json and os.path.exists(leaderboard_json):
+        shutil.copy(leaderboard_json, os.path.join(out_dir, "leaderboard.json"))
+        ex.extra["leaderboard"] = "leaderboard.json"
+
+    labels = {"ours": ("OceanEmbed", "ours"), "glorys": ("GLORYS12", "reference"), "hycom": ("HYCOM GOFS 3.1", "reference")}
+    return ex.finish(products={p: {"label": labels[p][0], "kind": labels[p][1]} for p in products},
+                     inputs=list(C.INPUT_VARS), primary="ours", argo_match="same day, nearest 0.25° cell")
