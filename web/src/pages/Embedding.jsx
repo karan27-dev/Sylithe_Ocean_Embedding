@@ -199,7 +199,7 @@ export default function Embedding() {
         </SectionHead>
         <ol className="mt-8 grid gap-2 md:grid-cols-5">
           {STEPS.map(([t, d, sh], i) => (
-            <li key={t} className={`rounded-[10px] border px-3 py-2.5 ${i === 2 ? 'border-[#D9B994] bg-[#F3E2CF] text-[#7C4A1E]' : 'border-[#EBDCCB] bg-[#FAF0E6]'}`}>
+            <li key={t} className={`rounded-[10px] border px-3 py-2.5 ${i === 2 ? 'border-[#C3CAD3] bg-[#EEF0F2] text-[#334155]' : 'border-[#EBDCCB] bg-[#FAF0E6]'}`}>
               <p className="num text-[10.5px] opacity-60">0{i + 1}</p>
               <p className="text-[13px] font-medium">{t}</p>
               <p className="mt-0.5 text-[11.5px] opacity-75">{d}</p>

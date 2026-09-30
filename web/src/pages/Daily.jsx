@@ -176,7 +176,7 @@ export default function Daily() {
   const url = useMemo(() => grid && renderGrid(ops.grid, grid, L_.ramp, crange), [grid, crange]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const modeSwitch = (
-    <span className="inline-flex h-8 items-center gap-2 rounded-[8px] border border-[#E3C7A8] bg-[#F3E2CF] px-3 text-[12.5px] text-[#7C4A1E]">
+    <span className="inline-flex h-8 items-center gap-2 rounded-[8px] border border-[#D5DAE0] bg-[#EEF0F2] px-3 text-[12.5px] text-[#334155]">
       <span className={`inline-block h-[7px] w-[7px] rounded-full ${liveDown ? 'bg-line2' : 'bg-[#4D9F6A] animate-pulse'}`} />{liveDown ? 'Offline · 2023 data' : 'Live'}
     </span>
   )
@@ -339,7 +339,7 @@ export default function Daily() {
             {L_.perDepth && <DepthPicker depths={DEPTHS} k={depthK} onChange={setDepthK} />}
             <CursorReadout bind={hoverRef} layer={L_} depth={z} />
           </div>
-          <button onClick={toAnalysis} className="flex items-center justify-center gap-2 border-t border-[#E3C7A8] bg-[#F3E2CF] px-4 py-3 text-[13px] text-[#7C4A1E] hover:bg-[#EDD5BB]">
+          <button onClick={toAnalysis} className="flex items-center justify-center gap-2 border-t border-[#D5DAE0] bg-[#EEF0F2] px-4 py-3 text-[13px] text-[#334155] hover:bg-[#E2E6EA]">
             Full analysis below <ArrowDown size={14} /></button>
         </aside>
 

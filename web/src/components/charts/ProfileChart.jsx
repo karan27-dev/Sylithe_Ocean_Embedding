@@ -47,7 +47,7 @@ export default function ProfileChart({ main, others = [], points = [], mld, mark
         )}
         {Number.isFinite(mark) && mark <= zmax && (
           <g><line x1={m.l} x2={W - m.r} y1={y(mark)} y2={y(mark)} stroke="#C2702E" strokeDasharray="4 3" />
-            <text x={W - m.r - 2} y={y(mark) - 4} textAnchor="end" className="num fill-[#9A5424] text-[10px]">{mark} m</text></g>
+            <text x={W - m.r - 2} y={y(mark) - 4} textAnchor="end" className="num fill-[#475569] text-[10px]">{mark} m</text></g>
         )}
         {/* axes */}
         {ZT.filter((z) => z <= zmax).map((z) => (

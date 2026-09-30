@@ -108,7 +108,7 @@ export default function Explorer() {
             {layer.perDepth && <DepthPicker depths={DEPTHS} k={v.depth} onChange={(k) => v.set({ depth: k })} />}
             <CursorReadout bind={hoverRef} layer={layer} depth={z} />
           </div>
-          <button onClick={toAnalysis} className="flex items-center justify-center gap-2 border-t border-[#E3C7A8] bg-[#F3E2CF] px-4 py-3 text-[13px] text-[#7C4A1E] hover:bg-[#EDD5BB]">
+          <button onClick={toAnalysis} className="flex items-center justify-center gap-2 border-t border-[#D5DAE0] bg-[#EEF0F2] px-4 py-3 text-[13px] text-[#334155] hover:bg-[#E2E6EA]">
             Point analysis below <ArrowDown size={14} /></button>
         </aside>
 

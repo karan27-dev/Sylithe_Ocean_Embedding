@@ -10,7 +10,7 @@ export function Side({ n, title, aside, open: init = true, children }) {
   return (
     <section className="border-b border-line">
       <button onClick={() => setOpen((o) => !o)} className="flex w-full items-center gap-2.5 px-4 py-3 text-left hover:bg-wash">
-        <span className="num flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#F3E2CF] text-[10.5px] text-[#9A5424]">{n}</span>
+        <span className="num flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#EEF0F2] text-[10.5px] text-[#475569]">{n}</span>
         <span className="text-[13px] text-ink">{title}</span>
         <span className="ml-auto truncate text-[11px] text-mute">{aside}</span>
         <ChevronDown size={14} className={`shrink-0 text-faint transition-transform ${open ? '' : '-rotate-90'}`} />
@@ -23,7 +23,7 @@ export function Side({ n, title, aside, open: init = true, children }) {
 export function SideTool({ on, onClick, title, children, className = '' }) {
   return (
     <button onClick={onClick} title={title} aria-pressed={on}
-      className={`flex h-9 items-center justify-center gap-1.5 rounded-[7px] border px-2 text-[12px] transition-colors ${on ? 'border-[#E3C7A8] bg-[#F3E2CF] text-[#7C4A1E]' : 'border-line bg-paper text-ink2 hover:border-line2 hover:text-ink'} ${className}`}>
+      className={`flex h-9 items-center justify-center gap-1.5 rounded-[7px] border px-2 text-[12px] transition-colors ${on ? 'border-[#D5DAE0] bg-[#EEF0F2] text-[#334155]' : 'border-line bg-paper text-ink2 hover:border-line2 hover:text-ink'} ${className}`}>
       {children}
     </button>
   )
@@ -32,7 +32,7 @@ export function SideTool({ on, onClick, title, children, className = '' }) {
 export function MapBtn({ on, onClick, title, children }) {
   return (
     <button onClick={onClick} title={title} aria-pressed={on}
-      className={`flex h-9 items-center gap-1.5 rounded-[8px] border px-2.5 text-[12px] shadow-sm backdrop-blur transition-colors ${on ? 'border-[#E3C7A8] bg-[#F3E2CF] text-[#7C4A1E]' : 'border-line bg-paper/95 text-ink2 hover:text-ink'}`}>
+      className={`flex h-9 items-center gap-1.5 rounded-[8px] border px-2.5 text-[12px] shadow-sm backdrop-blur transition-colors ${on ? 'border-[#D5DAE0] bg-[#EEF0F2] text-[#334155]' : 'border-line bg-paper/95 text-ink2 hover:text-ink'}`}>
       {children}
     </button>
   )

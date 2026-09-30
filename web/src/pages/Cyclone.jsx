@@ -304,7 +304,7 @@ export default function Cyclone() {
       {/* ================================================ controls */}
       <div className="sticky top-[var(--bar)] z-[900] mt-8 border-y border-line bg-paper/95 backdrop-blur">
         <div className="page flex flex-wrap items-center gap-x-6 gap-y-2 py-2.5">
-          <span className="inline-flex h-7 items-center gap-2 rounded-[7px] border border-[#E3C7A8] bg-[#F3E2CF] px-2.5 text-[12px] text-[#7C4A1E]">
+          <span className="inline-flex h-7 items-center gap-2 rounded-[7px] border border-[#D5DAE0] bg-[#EEF0F2] px-2.5 text-[12px] text-[#334155]">
             <span className={`h-[7px] w-[7px] rounded-full ${live ? 'animate-pulse bg-[#4D9F6A]' : 'bg-line2'}`} />{live ? 'Live' : 'Offline · 2023 data'}</span>
           <Timeline days={m.days} value={date} onChange={setDate} className="min-w-[240px] max-w-[460px] flex-1" />
           <span className="num text-[12.5px] text-ink">{fmtDate(date)}</span>
