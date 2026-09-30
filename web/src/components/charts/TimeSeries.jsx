@@ -10,7 +10,7 @@ import { fmt, fmtDate } from '../../lib/ocean'
  *  threshold { value, label } horizontal reference line
  */
 export default function TimeSeries({ dates, series, unit, dp = 2, marker, threshold, height = 170, invert = false }) {
-  const [ref, W] = useWidth(360)
+  const [ref, W] = useWidth(300)
   const [hi, setHi] = useState(null)
   const L = 44, R = 8, T = 10, B = 22
   const all = series.flatMap((s) => [...s.values, ...(s.band ? [...s.band[0], ...s.band[1]] : [])]).filter(Number.isFinite)
@@ -35,7 +35,7 @@ export default function TimeSeries({ dates, series, unit, dp = 2, marker, thresh
   }
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className="relative w-full min-w-0 overflow-hidden">
       <svg width={W} height={height} className="block" onMouseMove={onMove} onMouseLeave={() => setHi(null)}>
         {yt.map((v) => (
           <g key={v}>

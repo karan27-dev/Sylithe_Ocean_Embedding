@@ -34,7 +34,7 @@ function Select({ label, value, onChange, children }) {
 function Kpi({ label, value, prev, unit, dp, alert }) {
   const d = Number.isFinite(value) && Number.isFinite(prev) ? value - prev : NaN
   return (
-    <div className="border-l border-line pl-4 first:border-0 first:pl-0">
+    <div className="border-line first:border-0 first:pl-0 max-sm:pl-0 sm:border-l sm:pl-4">
       <p className="label">{label}</p>
       <p className={`num mt-1.5 text-[24px] leading-none ${alert ? 'text-heat' : 'text-ink'}`}>{fmt(value, dp)}
         <span className="ml-1 text-[11px] text-faint">{unit}</span></p>
@@ -142,7 +142,7 @@ export default function Daily() {
             {RANGES.map(([k, l]) => <button key={k} aria-pressed={range === k} onClick={() => setRange(k)}>{l}</button>)}
           </div>
         </div>
-        <div className="ml-auto text-right text-[12px] text-mute">
+        <div className="w-full text-[12px] text-mute sm:ml-auto sm:w-auto sm:text-right">
           {run ? <>
             <p><span className="mr-1.5 inline-block h-[7px] w-[7px] rounded-full bg-sea align-middle" />Computed once, served from cache</p>
             <p className="num text-[11px] text-faint">{run.members}-model ensemble · {run.window}-day input window · inputs {Math.round(minValid * 100)}–100 % valid</p>
@@ -152,7 +152,7 @@ export default function Daily() {
 
       {/* today */}
       {today && (
-        <div className="grid grid-cols-2 gap-y-6 border-b border-line py-6 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="grid grid-cols-2 gap-y-6 border-b border-line py-6 sm:grid-cols-3 lg:grid-cols-6 [&>*]:min-w-0">
           <Kpi label="Sea surface temp." value={today.sst} prev={before?.sst} unit="°C" dp={2} />
           <Kpi label={`Temperature, ${z} m`} value={today.T[depthK]} prev={before?.T[depthK]} unit="°C" dp={2} />
           <Kpi label={`Uncertainty, ${z} m`} value={today.sigma[depthK]} prev={before?.sigma[depthK]} unit="± °C" dp={2} />
@@ -165,7 +165,7 @@ export default function Daily() {
       {/* model output */}
       <section className="pt-10">
         <SectionHead label="Model prediction" title={`${REGIONS[region].label}, regional mean`} />
-        <div className="mt-6 grid gap-x-10 gap-y-9 lg:grid-cols-2">
+        <div className="mt-6 grid gap-x-10 gap-y-9 lg:grid-cols-2 [&>*]:min-w-0">
           <div>
             <p className="mb-2 text-[13px] text-ink">Temperature at {z} m <span className="text-faint">· with ±1σ</span></p>
             <TimeSeries dates={dates} unit="°C" marker={date} series={[{
@@ -197,7 +197,7 @@ export default function Daily() {
       {/* inputs */}
       <section className="pt-14">
         <SectionHead label="Satellite inputs" title="What the model read" />
-        <div className="mt-6 grid gap-x-10 gap-y-9 md:grid-cols-2 xl:grid-cols-3">
+        <div className="mt-6 grid gap-x-10 gap-y-9 md:grid-cols-2 xl:grid-cols-3 [&>*]:min-w-0">
           {INPUTS.map(([k, label, unit, dp, src]) => (
             <div key={k}>
               <p className="mb-2 text-[13px] text-ink">{label} <span className="text-faint">· {unit} · {src}</span></p>
