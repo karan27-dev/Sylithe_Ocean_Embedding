@@ -4,6 +4,7 @@ import { useData } from '../App'
 import OceanMap from '../components/map/OceanMap'
 import Legend from '../components/map/Legend'
 import { SectionHead } from '../components/ui'
+import Timeline from '../components/Timeline'
 import { useDay, useDays } from '../lib/data'
 import { useView } from '../lib/store'
 import { REGIONS, derived, fmt, fmtDate, fmtLat, fmtLon, inRegion, layerById, renderGrid } from '../lib/ocean'
@@ -91,9 +92,8 @@ export default function Cyclone() {
         </SectionHead>
         <div className="mt-8 flex flex-wrap items-center gap-4 print:hidden">
           <span className="label">Day</span>
-          <div className="seg">
-            {m.days.map((d) => <button key={d.date} aria-pressed={d.date === date} onClick={() => set({ date: d.date })}>{fmtDate(d.date)}</button>)}
-          </div>
+          <Timeline days={m.days} value={date} onChange={(d) => set({ date: d })} className="min-w-[280px] max-w-[640px] flex-1" />
+          <span className="num text-[12.5px] text-ink">{fmtDate(date)}</span>
           {m.source.kind !== 'model' && <span className="text-[12px] text-mute">{m.source.label}, reference field</span>}
         </div>
       </div>

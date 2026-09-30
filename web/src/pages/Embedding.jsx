@@ -4,6 +4,7 @@ import { useData } from '../App'
 import { Pending, SectionHead } from '../components/ui'
 import Field from '../components/FieldCanvas'
 import { linePath, linear, sqrtDepth, useWidth } from '../components/charts/scale'
+import Timeline from '../components/Timeline'
 import { useDay } from '../lib/data'
 import { useView } from '../lib/store'
 import { latentFor, latentRGB, regimeStats } from '../lib/latent'
@@ -115,9 +116,8 @@ export default function Embedding() {
         )}
         <div className="mt-6 flex items-center gap-4">
           <span className="label">Day</span>
-          <div className="seg">
-            {m.days.map((d) => <button key={d.date} aria-pressed={d.date === date} onClick={() => set({ date: d.date })}>{fmtDate(d.date)}</button>)}
-          </div>
+          <Timeline days={m.days} value={date} onChange={(d) => set({ date: d })} className="min-w-[280px] max-w-[640px] flex-1" />
+          <span className="num text-[12.5px] text-ink">{fmtDate(date)}</span>
         </div>
       </div>
 
