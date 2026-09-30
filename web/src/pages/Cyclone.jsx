@@ -1,202 +1,350 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useData } from '../App'
-import OceanMap from '../components/map/OceanMap'
-import Legend from '../components/map/Legend'
-import { SectionHead } from '../components/ui'
+import { ArrowRight, Check, Copy } from 'lucide-react'
+import FigMap from '../components/charts/FigMap'
+import TimeSeries from '../components/charts/TimeSeries'
+import ProfileChart from '../components/charts/ProfileChart'
+import DepthTimeChart from '../components/charts/DepthTimeChart'
 import Timeline from '../components/Timeline'
-import { useDay, useDays } from '../lib/data'
-import { useView } from '../lib/store'
-import { REGIONS, derived, fmt, fmtDate, fmtLat, fmtLon, inRegion, layerById, renderGrid } from '../lib/ocean'
+import { SectionHead } from '../components/ui'
+import { level, useDay, useJSON, useManifest } from '../lib/data'
+import { DEPTHS, REGIONS, derived, fmt, fmtDate, fmtLat, fmtLon, layerGrid, robustRange } from '../lib/ocean'
+import { CATS, RULES, VORT, WIND, catOf, drivers, features, ocpiOfRecord, peaks, regionSummary, t100 } from '../lib/cyclone'
 
-const THRESH = 50                       // kJ cm⁻²: commonly used rapid-intensification threshold (Mainelli et al., 2008)
-const RANGE = [0, 150]
-const BOX = 2                           // hotspot box size, degrees
+const LIVE = import.meta.env.VITE_LIVE_BASE || 'https://raw.githubusercontent.com/karan27-dev/Sylithe_Ocean_Embedding/live-data/web'
+const REPLAY = '/data/ops'
+const RCOL = { BoB: '#2F6F6A', AS: '#C29A55', NIO: '#0F172A' }
+const RS = ['BoB', 'AS', 'NIO']
+const addDays = (iso, n) => new Date(Date.parse(iso) + n * 864e5).toISOString().slice(0, 10)
+const r2 = (v, d = 2) => (Number.isFinite(v) ? +v.toFixed(d) : null)
 
-function regionStats(m, day) {
-  const d = derived(m, day), g = m.grid, out = {}
-  for (const r of Object.keys(REGIONS)) {
-    let n = 0, hot = 0, max = -Infinity, d26 = 0, nd = 0, sst = 0, ns = 0, sum = 0
-    for (let y = 0; y < g.height; y++) for (let x = 0; x < g.width; x++) {
-      const i = y * g.width + x, lat = g.lat0 - y * g.step, lon = g.lon0 + x * g.step
-      if (!Number.isFinite(d.tchp[i]) || !inRegion(r, lat, lon)) continue
-      n++; sum += d.tchp[i]; if (d.tchp[i] >= THRESH) hot++; max = Math.max(max, d.tchp[i])
-      if (Number.isFinite(d.d26[i])) { d26 += d.d26[i]; nd++ }
-      const s = day.sst?.[i] ?? day.temp[i]
-      if (Number.isFinite(s)) { sst += s; ns++ }
-    }
-    out[r] = { share: n ? hot / n : NaN, mean: n ? sum / n : NaN, max, d26: nd ? d26 / nd : NaN, sst: ns ? sst / ns : NaN }
-  }
-  return out
+// ---------------------------------------------------------------- figure shell
+function Fig({ id, n, title, caption, children, cols = 'lg:grid-cols-[1.25fr_1fr]' }) {
+  return (
+    <section id={id} className="scroll-mt-28 rounded-[12px] border border-line bg-white/70 p-4 sm:p-5">
+      <div className={`grid items-start gap-5 ${cols}`}>{children}</div>
+      <p className="mt-3 border-t border-line pt-3 text-[12.5px] leading-relaxed text-ink2">
+        <span className="font-medium text-ink">Figure {n}. {title}.</span> {caption}</p>
+    </section>
+  )
 }
 
-/** Highest-TCHP 2° boxes, greedy and non-overlapping. */
-function hotspots(m, day, k = 6) {
-  const d = derived(m, day), g = m.grid, per = Math.round(BOX / g.step), boxes = []
-  for (let by = 0; by < g.height; by += per) for (let bx = 0; bx < g.width; bx += per) {
-    let best = null
-    for (let y = by; y < Math.min(by + per, g.height); y++) for (let x = bx; x < Math.min(bx + per, g.width); x++) {
-      const i = y * g.width + x
-      if (Number.isFinite(d.tchp[i]) && (!best || d.tchp[i] > d.tchp[best.i])) best = { i, lat: g.lat0 - y * g.step, lon: g.lon0 + x * g.step }
-    }
-    if (best && d.tchp[best.i] >= THRESH) boxes.push({ ...best, tchp: d.tchp[best.i], d26: d.d26[best.i], sst: day.sst?.[best.i] ?? day.temp[best.i] })
-  }
-  boxes.sort((a, b) => b.tchp - a.tchp)
-  const out = []
-  for (const b of boxes) {
-    if (out.every((o) => Math.hypot(o.lat - b.lat, o.lon - b.lon) > 4)) out.push(b)
-    if (out.length === k) break
-  }
-  return out
+/** Time-series panel: one line per region, same styling in every figure. */
+function Panel({ tag, title, dates, values, unit, dp = 2, marker, threshold, invert }) {
+  return (
+    <figure className="min-w-0">
+      <figcaption className="mb-1 text-center font-display text-[14px] text-ink"><span className="mr-1 text-mute">({tag})</span>{title}</figcaption>
+      <TimeSeries dates={dates} unit={unit} dp={dp} marker={marker} threshold={threshold} invert={invert} height={200}
+        series={RS.map((r) => ({ label: REGIONS[r].short, color: RCOL[r], values: values(r), dashed: r === 'NIO' }))} />
+      <div className="mt-1 flex flex-wrap justify-center gap-x-4 text-[11px] text-mute">
+        {RS.map((r) => <span key={r}><span className={`mr-1.5 inline-block w-4 align-middle ${r === 'NIO' ? 'border-t-[1.5px] border-dashed' : 'h-[2px]'}`}
+          style={r === 'NIO' ? { borderColor: RCOL[r] } : { background: RCOL[r] }} />{REGIONS[r].label}</span>)}
+      </div>
+    </figure>
+  )
 }
 
-function bulletin(m, day, st, hs) {
-  const src = m.source.kind === 'model' ? 'the Sylithe Ocean Model reconstruction' : `${m.source.label} (reference field)`
-  const b = st.BoB, a = st.AS
-  const pct = (v) => `${Math.round(v * 100)} %`
+function CopyBtn({ text, label = 'Copy' }) {
+  const [ok, setOk] = useState(false)
+  return (
+    <button onClick={() => navigator.clipboard?.writeText(text).then(() => { setOk(true); setTimeout(() => setOk(false), 1200) })}
+      className="inline-flex items-center gap-1 text-[11.5px] text-mute hover:text-ink">{ok ? <><Check size={12} />Copied</> : <><Copy size={12} />{label}</>}</button>
+  )
+}
+
+// ---------------------------------------------------------------- LLM hand-off
+const PROMPT = `You write the daily ocean-heat bulletin of the Sylithe Ocean Model for cyclone forecasters.
+Use ONLY the numbers in the JSON below; never invent, round differently or add numbers.
+Do not forecast cyclone genesis, track, intensity or landfall: the data describe the ocean only;
+vertical wind shear, humidity and other atmospheric conditions are not assessed.
+Write 120–180 words: a one-line headline, then Bay of Bengal, Arabian Sea, hotspots
+(with coordinates and their strongest drivers), any disturbance-over-warm-ocean watch points,
+the 7-day change, and the caveats listed in the JSON.`
+
+function buildPayload({ date, live, run, sum, recs, prev, hs, watch, dayObj, m }) {
+  const region = (r) => {
+    const a = recs[r] ?? {}, p = prev[r] ?? {}
+    const oc = ocpiOfRecord(a), ocP = ocpiOfRecord(p)
+    return {
+      sst_c: r2(a.sst), sss_psu: r2(a.sss), sla_m: r2(a.sla, 3), wind_ms: r2(a.wind, 1), current_ms: r2(a.cur),
+      tchp_kj_cm2: r2(a.tchp, 0), d26_m: r2(a.d26, 0), d20_m: r2(a.d20, 0), mld_m: r2(a.mld, 0), t100_c: r2(a.T ? t100(a.T) : NaN),
+      ocpi_of_mean_conditions: r2(oc), ocpi_mean_of_cells: r2(sum[r].mean), share_ocpi_high: r2(sum[r].share_high), share_ocpi_very_high: r2(sum[r].share_very_high),
+      watch_cells: sum[r].watch_cells, change_7d: { ocpi: r2(oc - ocP), tchp_kj_cm2: r2(a.tchp - p.tchp, 0), sst_c: r2(a.sst - p.sst) },
+    }
+  }
+  return {
+    product: 'Sylithe Ocean Model · ocean cyclone potential', date, mode: live ? 'live, near-real-time inputs' : '2023 replay, reprocessed inputs',
+    model: { members: run?.members ?? 3, window_days: run?.window ?? 15, revision: run?.revision ?? 0, inputs_valid: run?.inputs_valid ?? null, inputs_pending: run?.missing_today ?? [] },
+    index: { name: 'OCPI', range: [0, 1], categories: CATS.map((c) => ({ label: c.label, from: c.min })),
+      weights: Object.fromEntries(RULES.map((r) => [r.key, r.w])), gate: 'OCPI = 0 where SST < 26 °C' },
+    regions: Object.fromEntries(RS.map((r) => [REGIONS[r].label, region(r)])),
+    hotspots: hs.map((h, j) => ({ rank: j + 1, lat: r2(h.lat), lon: r2(h.lon), ocpi: r2(h.v), category: catOf(h.v)?.label,
+      drivers: drivers(m, dayObj, h.i).slice(0, 3).map((d) => ({ name: d.label, value: r2(d.value, d.dp), unit: d.unit })) })),
+    watch_points: watch.map((w) => ({ lat: r2(w.lat), lon: r2(w.lon), ocpi: r2(w.ocpi), surface_vorticity_1e5_s: r2(w.vort * 1e5, 1), wind_ms: r2(w.wind, 1) })),
+    caveats: ['Ocean conditions only; atmospheric shear and humidity are not included.',
+      'Surface vorticity comes from satellite surface winds, a proxy for low-level circulation.',
+      live ? 'Live inputs are near-real-time; the live check against Argo gives about 1.05 °C RMSE.' : 'Replay uses reprocessed inputs (0.757 °C RMSE against Argo in 2023).'],
+  }
+}
+
+function bulletinText(p) {
+  const b = p.regions['Bay of Bengal'], a = p.regions['Arabian Sea']
+  const pct = (v) => `${Math.round((v ?? 0) * 100)} %`
+  const sg = (v) => `${v >= 0 ? '+' : ''}${v}`
   const lines = [
-    `Upper-ocean heat for ${fmtDate(day.date, true)}, from ${src}.`,
-    `Bay of Bengal: ${pct(b.share)} of the ocean area exceeds ${THRESH} kJ cm⁻² of tropical cyclone heat potential, with a basin mean of ${fmt(b.mean, 0)} and a maximum of ${fmt(b.max, 0)} kJ cm⁻². The 26 °C isotherm lies at ${fmt(b.d26, 0)} m on average.`,
-    `Arabian Sea: ${pct(a.share)} above the threshold, mean ${fmt(a.mean, 0)} and maximum ${fmt(a.max, 0)} kJ cm⁻², mean D26 ${fmt(a.d26, 0)} m.`,
+    `${fmtDate(p.date, true)} · ocean cyclone potential from the Sylithe Ocean Model (${p.mode}).`,
+    `Bay of Bengal: ${pct(b.share_ocpi_high)} of the ocean scores High or above on the OCPI (mean ${b.ocpi_mean_of_cells}). Heat potential ${b.tchp_kj_cm2} kJ cm⁻², upper-100 m temperature ${b.t100_c} °C, 26 °C isotherm at ${b.d26_m} m. 7-day change in OCPI ${sg(b.change_7d.ocpi)}.`,
+    `Arabian Sea: ${pct(a.share_ocpi_high)} High or above (mean ${a.ocpi_mean_of_cells}); heat potential ${a.tchp_kj_cm2} kJ cm⁻², upper-100 m ${a.t100_c} °C, D26 ${a.d26_m} m; 7-day OCPI change ${sg(a.change_7d.ocpi)}.`,
   ]
-  if (hs.length) lines.push(`Highest heat content near ${hs.slice(0, 3).map((h) => `${fmtLat(h.lat)} ${fmtLon(h.lon)} (${fmt(h.tchp, 0)})`).join('; ')}.`)
-  lines.push(b.share > 0.5 || a.share > 0.5
-    ? 'A large share of the basin can sustain rapid intensification should a disturbance develop over it.'
-    : 'Heat available to cyclones is limited over most of the basin.')
+  if (p.hotspots.length) lines.push(`Strongest ocean support: ${p.hotspots.slice(0, 3).map((h) => `${fmtLat(h.lat)} ${fmtLon(h.lon)} (OCPI ${h.ocpi}, led by ${h.drivers[0]?.name.toLowerCase()})`).join('; ')}.`)
+  lines.push(p.watch_points.length
+    ? `Watch: ${p.watch_points.length} point(s) where a cyclonic surface circulation with winds ≥ ${WIND} m s⁻¹ sits over High-potential ocean, strongest near ${fmtLat(p.watch_points[0].lat)} ${fmtLon(p.watch_points[0].lon)}.`
+    : 'No cyclonic surface disturbance over High-potential ocean today.')
+  lines.push('Ocean conditions only: vertical wind shear and humidity are not assessed. Verify against IMD and INCOIS advisories.')
   return lines
 }
 
+// ---------------------------------------------------------------- page
 export default function Cyclone() {
-  const { m } = useData()
-  const { date, set } = useView()
+  const liveM = useManifest(LIVE)
+  const OPS = liveM.error ? REPLAY : LIVE, live = OPS === LIVE
+  const { m } = useManifest(OPS)
+  const series = useJSON('series.json', OPS)
+  const index = useJSON('index.json', OPS)
+  const bull = useJSON('bulletin.json', OPS)
+  const [date, setDate] = useState(null)
+  const [region, setRegion] = useState('BoB')
+  const [depthK, setDepthK] = useState(DEPTHS.indexOf(100))
+  const [view, setView] = useState('text')
+
+  useEffect(() => { if (m && (!date || !m.days.some((d) => d.date === date))) setDate(m.days[m.days.length - 1].date) }, [m, date])
   const day = useDay(m, date)
-  const [pick, setPick] = useState(null)
-  const all = useDays(m, useMemo(() => m?.days.map((d) => d.date), [m]))
+  // late inputs: show the newest day on or before `date` that has them
+  const lastWith = (k) => m?.days.filter((x) => x.date <= (date ?? '') && x.layers.includes(k)).at(-1)?.date ?? null
+  const sssDate = lastWith('sss'), windDate = lastWith('uw')
+  const sssDay = useDay(m, sssDate !== date ? sssDate : null)
+  const windDay = useDay(m, windDate !== date ? windDate : null)
 
-  const tchp = useMemo(() => (m && day ? derived(m, day).tchp : null), [m, day])
-  const url = useMemo(() => tchp && renderGrid(m.grid, tchp, 'matter', RANGE), [tchp, m])
-  const st = useMemo(() => (m && day ? regionStats(m, day) : null), [m, day])
-  const hs = useMemo(() => (m && day ? hotspots(m, day) : []), [m, day])
-  const series = useMemo(() => (m ? all.map((d) => ({ date: d.date, st: regionStats(m, d) })) : []), [all, m])
+  const dates = useMemo(() => (series ? Object.keys(series.days).sort() : []), [series])
+  const rec = (d, r) => series?.days[d]?.[r]
+  const vals = (fn) => (r) => dates.map((d) => { const x = rec(d, r); return x ? fn(x) ?? NaN : NaN })
 
-  if (!m || !day || !st) return <div className="page min-h-[70vh] pt-16"><p className="label">Loading</p></div>
-  const text = bulletin(m, day, st, hs)
+  const f = useMemo(() => (m && day ? features(m, day) : null), [m, day])
+  const d = useMemo(() => (m && day ? derived(m, day) : null), [m, day])
+  const sum = useMemo(() => (m && day ? regionSummary(m, day) : null), [m, day])
+  const hs = useMemo(() => (f ? peaks(m, f.ocpi, { k: 6, sep: 4, min: 0.5 }) : []), [f, m])
+  const wDay = day?.uw ? day : windDay
+  const fW = useMemo(() => (m && wDay ? features(m, wDay) : null), [m, wDay])
+  const vort5 = useMemo(() => fW && fW.vort.map((v) => v * 1e5), [fW])
+  const watch = useMemo(() => (f && fW ? peaks(m, f.ocpi, { k: 5, sep: 3, min: 0.5, keep: (i) => fW.vort[i] > VORT && fW.wind[i] >= WIND })
+    .map((p) => ({ ...p, ocpi: p.v, vort: fW.vort[p.i], wind: fW.wind[p.i] })) : []), [f, fW, m])
+
+  if (!m || !day || !series || !f) return <div className="page min-h-[70vh] pt-16"><p className="label">Loading the live ocean state…</p></div>
+
+  const run = index?.runs?.[date]
+  const recs = Object.fromEntries(RS.map((r) => [r, rec(date, r)]))
+  const prev = Object.fromEntries(RS.map((r) => [r, rec(addDays(date, -7), r)]))
+  const payload = buildPayload({ date, live, run, sum, recs, prev, hs, watch, dayObj: day, m })
+  const text = bulletinText(payload)
+  const json = JSON.stringify(payload, null, 2)
+  const llm = bull?.llm?.text && bull.llm.checked && bull.date === date ? bull.llm : null
+  const llmState = llm ? 'DeepSeek · number check passed' : bull?.llm?.error ? 'DeepSeek call failed · template shown'
+    : bull?.llm && !bull.llm.checked ? 'DeepSeek answer rejected by the number check · template shown' : 'DeepSeek: add DEEPSEEK_API_KEY to switch on'
+  const z = DEPTHS[depthK]
+  const rr = (grid, sym) => grid && robustRange(grid, sym)
+  const regionRec = recs[region]
+  const hsMarks = hs.map((h, j) => ({ lat: h.lat, lon: h.lon, label: j + 1 }))
+  const watchMarks = watch.map((w) => ({ lat: w.lat, lon: w.lon, kind: 'cross' }))
+  const pending = (k) => (day[k] ? null : <p className="rounded-[8px] bg-wash px-3 py-8 text-center text-[12.5px] text-mute">Not yet published for {fmtDate(date)} (late input); the model ran without it.</p>)
+
+  const INPUTS = [
+    { id: 'in-sst', k: 'sst', title: 'Sea surface temperature', grid: day.sst, ramp: 'thermal', unit: '°C', dp: 2, s: (x) => x.sst, src: live ? 'OSTIA NRT' : 'OSTIA L4',
+      cap: 'The first condition for a cyclone: 26 °C or warmer. SST alone cannot tell a thin warm skin from a deep warm layer, which is why the model looks beneath it.' },
+    { id: 'in-sss', k: 'sss', title: 'Sea surface salinity', grid: (day.sss ? day : sssDay)?.sss, on: day.sss ? date : sssDate, ramp: 'haline', unit: 'psu', dp: 2, s: (x) => x.sss, src: live ? 'SMOS/SMAP multi-obs NRT' : 'SMOS/SMAP multi-obs L4',
+      cap: 'River and monsoon freshwater in the Bay of Bengal makes a shallow, stable surface layer (a barrier layer) that limits how much cold water a storm can mix up.' },
+    { id: 'in-sla', k: 'sla', title: 'Sea level anomaly', grid: day.sla, ramp: 'balance', sym: true, unit: 'm', dp: 3, s: (x) => x.sla, src: live ? 'DUACS NRT' : 'DUACS DT',
+      cap: 'Highs mark warm-core eddies with a deep thermocline, lows cold-core eddies. The strongest subsurface signal among the inputs.' },
+    { id: 'in-cur', k: 'uc', title: 'Surface current speed', grid: layerGrid(m, day, 'cur'), ramp: 'speed', unit: 'm s⁻¹', dp: 2, s: (x) => x.cur, src: live ? 'DUACS geostrophic' : 'OSCAR v2',
+      cap: 'Currents move warm water around the basin and trace the boundary currents and eddies that shape the thermocline.' },
+    { id: 'in-wind', k: 'uw', title: '10 m wind speed', grid: (day.uw ? layerGrid(m, day, 'wind') : windDay && layerGrid(m, windDay, 'wind')), on: day.uw ? date : windDate, ramp: 'speed', unit: 'm s⁻¹', dp: 1, s: (x) => x.wind, src: live ? 'ASCAT-blended L4' : 'CCMP v3.1',
+      cap: 'Wind mixes the upper ocean and drives upwelling. Strong winds with a cyclonic swirl also mark an existing disturbance (see the disturbance watch).' },
+  ]
+  const OUTPUTS = [
+    { id: 'out-temp', title: `Temperature at ${z} m`, grid: level(m, day.temp, depthK), ramp: 'thermal', unit: '°C', dp: 2, s: (x) => x.T?.[depthK],
+      cap: `The model's reconstruction at ${z} m (change the depth in the bar above). Around 75–150 m the thermocline sits and the prediction is least certain.` },
+    { id: 'out-tchp', title: 'Tropical cyclone heat potential', grid: d.tchp, ramp: 'matter', range: [0, 150], unit: 'kJ cm⁻²', dp: 0, s: (x) => x.tchp, threshold: 50,
+      cap: 'Heat stored above the 26 °C isotherm. The bar on the scale and the dashed line mark 50 kJ cm⁻², above which rapid intensification becomes possible.' },
+    { id: 'out-t100', title: 'Mean temperature of the upper 100 m', grid: f.t100, ramp: 'thermal', unit: '°C', dp: 2, s: (x) => (x.T ? t100(x.T) : NaN),
+      cap: 'What a storm experiences after it has stirred the upper ocean (Price, 2009). Below about 26 °C the mixed water can no longer feed intensification.' },
+    { id: 'out-d26', title: 'Depth of the 26 °C isotherm', grid: d.d26, ramp: 'deep', unit: 'm', dp: 0, s: (x) => x.d26, invert: true,
+      cap: 'Thickness of the warm layer. The deeper it is, the harder it is for a storm to cool the surface below 26 °C.' },
+    { id: 'out-mld', title: 'Mixed-layer depth', grid: d.mld, ramp: 'deep', unit: 'm', dp: 0, s: (x) => x.mld, invert: true,
+      cap: 'Depth of the well-mixed surface layer; a shallow mixed layer over a sharp thermocline cools fastest under a storm.' },
+  ]
+  let n = 0
 
   return (
-    <div className="pb-8">
-      <div className="page pt-12 sm:pt-16 print:pt-4">
-        <SectionHead as="h1" label="Cyclone watch · upper-ocean heat" title="Where the ocean can feed a cyclone">
-          Tropical cyclones draw their energy from the warm layer above the 26 °C isotherm. Tropical Cyclone Heat Potential
-          (TCHP) integrates that heat from the surface to D26; above about {THRESH} kJ cm⁻² the ocean can support rapid
-          intensification. Surface temperature alone cannot show it: a thin warm skin and a deep warm layer look the same from space.
+    <div className="pb-12">
+      {/* ================================================ header */}
+      <div className="page pt-12 sm:pt-14">
+        <SectionHead as="h1" label={`Cyclone watch · ${live ? 'live' : '2023 replay'} · ${fmtDate(date)}`} title="From satellite input to cyclone potential">
+          Five satellite inputs go into the Sylithe Ocean Model, which predicts the temperature from the surface to 1000 m. A transparent logic engine turns
+          inputs and prediction into an Ocean Cyclone Potential Index (OCPI), finds hotspots and flags disturbances over warm ocean. Those numbers are
+          the only thing a language model receives to word the bulletin.
         </SectionHead>
-        <div className="mt-8 flex flex-wrap items-center gap-4 print:hidden">
-          <span className="label">Day</span>
-          <Timeline days={m.days} value={date} onChange={(d) => set({ date: d })} className="min-w-[280px] max-w-[640px] flex-1" />
-          <span className="num text-[12.5px] text-ink">{fmtDate(date)}</span>
-          {m.source.kind !== 'model' && <span className="text-[12px] text-mute">{m.source.label}, reference field</span>}
+
+        <div className="mt-8 grid items-stretch gap-2 md:grid-cols-[1.2fr_auto_1fr_auto_1.2fr_auto_1.2fr_auto_1fr]">
+          {[
+            ['#inputs', '01 · Satellite input', 'SST · SSS · SLA · currents · winds', 'bg-paper'],
+            ['#outputs', '02 · Sylithe Ocean Model', '3-model ensemble, 15-day window', 'bg-ink text-paper'],
+            ['#outputs', '03 · Ocean state', 'T 0–1000 m · TCHP · T100 · D26 · MLD', 'bg-paper'],
+            ['#potential', '04 · Cyclone logic', 'OCPI · hotspots · disturbance watch', 'bg-[#A3E635]/25'],
+            ['#bulletin', '05 · LLM bulletin', 'DeepSeek, words only · planned', 'border-dashed bg-paper'],
+          ].flatMap(([href, t, s, cls], i) => [
+            i > 0 ? <ArrowRight key={`a${i}`} size={16} className="hidden self-center text-mute md:block" /> : null,
+            <a key={t} href={href} className={`rounded-[10px] border border-line px-3 py-2.5 transition-colors hover:border-ink ${cls}`}>
+              <p className="text-[12.5px] font-medium">{t}</p><p className="mt-0.5 text-[11px] opacity-70">{s}</p></a>,
+          ]).filter(Boolean)}
         </div>
       </div>
 
-      <section className="mx-auto mt-8 grid w-full max-w-[1480px] gap-8 px-4 sm:px-8 lg:grid-cols-[1fr_380px]">
-        <div>
-          <div className="h-[300px] overflow-hidden rounded-[4px] border border-line sm:h-[540px] print:h-[380px]">
-            <OceanMap g={m.grid} url={url} grid={tchp} scrollZoom={false} padding={[12, 12]}
-              points={hs.map((h, n) => ({ id: `h${n}`, lat: h.lat, lon: h.lon, color: '#15181A', r: pick === n ? 8 : 6, stroke: '#F5F3EE', weight: 1.5 }))}
-              onPoint={(p) => setPick(+p.id.slice(1))} />
-          </div>
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-            <Legend layer={layerById.tchp} range={RANGE} marks={[{ v: THRESH, label: `${THRESH} kJ cm⁻²` }]} width={260} />
-            <p className="text-[11.5px] text-mute">Black dots: the six highest-heat {BOX}° boxes. Vertical mark on the scale: {THRESH} kJ cm⁻².</p>
-          </div>
+      {/* ================================================ controls */}
+      <div className="sticky top-[var(--bar)] z-[900] mt-8 border-y border-line bg-paper/95 backdrop-blur">
+        <div className="page flex flex-wrap items-center gap-x-6 gap-y-2 py-2.5">
+          <span className="inline-flex h-7 items-center gap-2 rounded-[7px] bg-ink px-2.5 text-[12px] text-paper">
+            <span className={`h-[7px] w-[7px] rounded-full ${live ? 'animate-pulse bg-[#A3E635]' : 'bg-line2'}`} />{live ? 'Live' : 'Offline · 2023 data'}</span>
+          <Timeline days={m.days} value={date} onChange={setDate} className="min-w-[240px] max-w-[460px] flex-1" />
+          <span className="num text-[12.5px] text-ink">{fmtDate(date)}</span>
+          <label className="flex items-center gap-2 text-[12px]"><span className="label">Profile region</span>
+            <select value={region} onChange={(e) => setRegion(e.target.value)} className="h-8 rounded-[7px] border border-line bg-paper px-2 text-[12.5px]">
+              {RS.map((r) => <option key={r} value={r}>{REGIONS[r].label}</option>)}</select></label>
+          <label className="flex items-center gap-2 text-[12px]"><span className="label">Depth</span>
+            <select value={depthK} onChange={(e) => setDepthK(+e.target.value)} className="h-8 rounded-[7px] border border-line bg-paper px-2 text-[12.5px]">
+              {DEPTHS.map((dd, k) => <option key={dd} value={k}>{dd} m</option>)}</select></label>
+        </div>
+      </div>
+
+      <div className="page">
+        {/* ================================================ inputs */}
+        <SectionHead id="inputs" className="scroll-mt-28 pt-12" label="01 · Satellite input" title="What the satellites saw">
+          Every figure has the same two panels: (a) the field on {fmtDate(date)} and (b) its area mean over every predicted day for the Bay of Bengal,
+          the Arabian Sea and the whole North Indian Ocean. Hover either panel to read values.
+        </SectionHead>
+        <div className="mt-6 space-y-6">
+          {INPUTS.map((x) => { n++; return (
+            <Fig key={x.id} id={x.id} n={n} title={`${x.title} (${x.src})`} caption={x.cap}>
+              <div>{x.grid ? <FigMap g={m.grid} grid={x.grid} ramp={x.ramp} range={rr(x.grid, x.sym)} unit={x.unit} dp={x.dp} tag="a" title={`${x.title}, ${fmtDate(x.on ?? date)}`} /> : pending(x.k)}
+                {x.on && x.on !== date && <p className="mt-1 text-center text-[11px] text-heat">Newest published: {fmtDate(x.on)}. The {fmtDate(date)} prediction ran without it; it is re-run when it arrives.</p>}</div>
+              <Panel tag="b" title="Area mean" dates={dates} values={vals(x.s)} unit={x.unit} dp={x.dp} marker={date} />
+            </Fig>) })}
         </div>
 
-        <aside>
-          <p className="label">By basin</p>
-          <table className="mt-3 w-full text-[12.5px]">
-            <thead>
-              <tr className="border-b border-line text-right">
-                <th className="label pb-2 text-left font-normal" />
-                <th className="label pb-2 font-normal">≥ {THRESH}</th><th className="label pb-2 font-normal">Mean</th>
-                <th className="label pb-2 font-normal">Max</th><th className="label pb-2 font-normal">D26</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(REGIONS).map(([k, r]) => (
-                <tr key={k} className="border-b border-line text-right">
-                  <td className="py-2.5 text-left text-ink">{r.label}</td>
-                  <td className={`num py-2.5 ${st[k].share >= 0.5 ? 'text-heat' : 'text-ink'}`}>{Math.round(st[k].share * 100)} %</td>
-                  <td className="num py-2.5 text-ink2">{fmt(st[k].mean, 0)}</td>
-                  <td className="num py-2.5 text-ink2">{fmt(st[k].max, 0)}</td>
-                  <td className="num py-2.5 text-ink2">{fmt(st[k].d26, 0)} m</td>
-                </tr>
-              ))}
-            </tbody>
+        {/* ================================================ outputs */}
+        <SectionHead id="outputs" className="scroll-mt-28 pt-16" label="02 · Model output" title="What the Sylithe Ocean Model predicts beneath">
+          The same two-panel layout for every predicted quantity, each computed from the predicted temperature column in every 0.25° cell.
+        </SectionHead>
+        <div className="mt-6 space-y-6">
+          {OUTPUTS.map((x) => { n++; return (
+            <Fig key={x.id} id={x.id} n={n} title={x.title} caption={x.cap}>
+              <FigMap g={m.grid} grid={x.grid} ramp={x.ramp} range={x.range ?? rr(x.grid)} unit={x.unit} dp={x.dp} tag="a" title={`${x.title}, ${fmtDate(date)}`} threshold={x.threshold} />
+              <Panel tag="b" title="Area mean" dates={dates} values={vals(x.s)} unit={x.unit} dp={x.dp} marker={date} invert={x.invert}
+                threshold={x.threshold ? { value: x.threshold, label: `${x.threshold} ${x.unit}` } : undefined} />
+            </Fig>) })}
+          {(() => { n++; return (
+            <Fig id="out-column" n={n} title={`The water column under the ${REGIONS[region].label}`} cols="lg:grid-cols-[1fr_1.5fr]"
+              caption="(a) Area-mean predicted profile with its ±1σ uncertainty, against the same area 7 days earlier. (b) The column over every predicted day, with the 26 °C (dashed) and 20 °C (solid) isotherms: a deepening dashed line means the warm layer is thickening.">
+              <figure><figcaption className="mb-1 text-center font-display text-[14px] text-ink"><span className="mr-1 text-mute">(a)</span>Profile, {fmtDate(date)}</figcaption>
+                {regionRec?.T ? <ProfileChart height={330} main={{ label: fmtDate(date), values: regionRec.T, sigma: regionRec.sigma }} mld={regionRec.mld}
+                  others={prev[region]?.T ? [{ label: '7 days before', values: prev[region].T, style: 'dashed' }] : []} /> : <p className="text-[12px] text-faint">No profile.</p>}</figure>
+              <figure><figcaption className="mb-1 text-center font-display text-[14px] text-ink"><span className="mr-1 text-mute">(b)</span>Depth over time, 0–300 m</figcaption>
+                <DepthTimeChart dates={dates} cols={dates.map((dd) => rec(dd, region)?.T)} zmax={300} height={300} /></figure>
+            </Fig>) })()}
+        </div>
+
+        {/* ================================================ cyclone potential */}
+        <SectionHead id="potential" className="scroll-mt-28 pt-16" label="03 · Cyclone logic" title="Ocean Cyclone Potential Index">
+          Seven ocean drivers, each scored 0–1 between published limits and combined with fixed weights (table below). Zero wherever the surface is
+          below 26 °C. It measures how strongly the ocean can support a cyclone, not whether one will form: the atmosphere is not in the data.
+        </SectionHead>
+        <div className="mt-6 space-y-6">
+          {(() => { n++; return (
+            <Fig id="pot-ocpi" n={n} title="Ocean Cyclone Potential Index" caption={`(a) OCPI on ${fmtDate(date)}; numbered rings are the ${hs.length} strongest hotspots at least 4° apart, crosses are watch points (next figure). (b) OCPI of each area's mean conditions over time; the dashed line marks High (0.5).`}>
+              <FigMap g={m.grid} grid={f.ocpi} ramp="matter" range={[0, 1]} unit="OCPI" dp={2} tag="a" title={`OCPI, ${fmtDate(date)}`} marks={[...hsMarks, ...watchMarks]} threshold={0.5} />
+              <Panel tag="b" title="OCPI of area-mean conditions" dates={dates} values={vals(ocpiOfRecord)} unit="" dp={2} marker={date} threshold={{ value: 0.5, label: 'High' }} />
+            </Fig>) })()}
+          {(() => { n++; return (
+            <Fig id="pot-vort" n={n} title="Disturbance watch"
+              caption={`(a) Relative vorticity of the satellite surface wind (red: cyclonic, anticlockwise in the northern hemisphere). A watch point (cross) needs vorticity above ${VORT * 1e5} × 10⁻⁵ s⁻¹, wind of at least ${WIND} m s⁻¹ and OCPI ≥ 0.5. (b) Watch points and the share of each area at High or above.`}>
+              <div>{vort5 ? <FigMap g={m.grid} grid={vort5} ramp="balance" range={[-6, 6]} unit="10⁻⁵ s⁻¹" dp={1} tag="a" title={`Surface wind vorticity, ${fmtDate(wDay?.date ?? date)}`} marks={watchMarks} /> : pending('uw')}</div>
+              <div>
+                <p className="mb-2 text-center font-display text-[14px] text-ink"><span className="mr-1 text-mute">(b)</span>Watch points</p>
+                {watch.length ? (
+                  <table className="w-full text-[12.5px]"><thead><tr className="border-b border-line text-left">
+                    {['Location', 'OCPI', 'Vorticity', 'Wind'].map((h) => <th key={h} className="label py-1.5 pr-3 font-normal">{h}</th>)}</tr></thead>
+                    <tbody>{watch.map((w) => <tr key={w.i} className="border-b border-line">
+                      <td className="num py-1.5 pr-3 text-ink">{fmtLat(w.lat)} {fmtLon(w.lon)}</td><td className="num pr-3">{fmt(w.ocpi, 2)}</td>
+                      <td className="num pr-3">{fmt(w.vort * 1e5, 1)}</td><td className="num">{fmt(w.wind, 1)} m s⁻¹</td></tr>)}</tbody></table>
+                ) : <p className="rounded-[8px] bg-wash px-3 py-3 text-[12.5px] text-mute">No cyclonic surface circulation with strong winds over High-potential ocean today.</p>}
+                <div className="mt-4 grid grid-cols-3 gap-px overflow-hidden rounded-[8px] border border-line bg-line text-center">
+                  {RS.map((r) => <div key={r} className="bg-paper px-2 py-2"><p className="label">{REGIONS[r].short}</p>
+                    <p className="num text-[18px] text-ink">{Math.round((sum[r].share_high || 0) * 100)} %</p><p className="text-[10.5px] text-mute">High or above</p></div>)}
+                </div>
+              </div>
+            </Fig>) })()}
+        </div>
+
+        <h3 className="mt-10 text-[15px] text-ink">Hotspots and what drives them</h3>
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full min-w-[760px] text-[12.5px]">
+            <thead><tr className="border-b border-line text-left">{['#', 'Location', 'OCPI', 'Category', 'Strongest drivers (score 0–1)'].map((h) => <th key={h} className="label py-2 pr-4 font-normal">{h}</th>)}</tr></thead>
+            <tbody>{hs.map((h, j) => { const c = catOf(h.v); return (
+              <tr key={h.i} className="border-b border-line align-top">
+                <td className="num py-2 pr-4 text-faint">{j + 1}</td>
+                <td className="num py-2 pr-4 text-ink">{fmtLat(h.lat)} {fmtLon(h.lon)}</td>
+                <td className="num py-2 pr-4">{fmt(h.v, 2)}</td>
+                <td className="py-2 pr-4"><span className="rounded-full px-2 py-0.5 text-[11px] text-white" style={{ background: c.color }}>{c.label}</span></td>
+                <td className="py-2 pr-4">{drivers(m, day, h.i).slice(0, 3).map((dv) => (
+                  <span key={dv.key} className="mr-3 inline-flex items-center gap-1.5"><span className="text-ink2">{dv.label}</span>
+                    <span className="num text-ink">{fmt(dv.value, dv.dp)} {dv.unit}</span><span className="num text-[11px] text-mute">({dv.score.toFixed(2)})</span></span>))}</td>
+              </tr>) })}</tbody>
           </table>
-          <p className="mt-2 text-[11px] text-faint">Share of ocean area above {THRESH} kJ cm⁻²; mean and maximum TCHP in kJ cm⁻².</p>
+          {!hs.length && <p className="mt-2 text-[12.5px] text-mute">No cell reaches High (0.5) today.</p>}
+        </div>
 
-          <p className="label mt-10">Hotspots</p>
-          <ol className="mt-3">
-            {hs.map((h, n) => (
-              <li key={n} onMouseEnter={() => setPick(n)} onMouseLeave={() => setPick(null)}
-                className={`grid grid-cols-[20px_1fr_auto] items-baseline gap-3 border-b border-line py-2.5 transition-colors ${pick === n ? 'bg-wash' : ''}`}>
-                <span className="num text-[11px] text-faint">{n + 1}</span>
-                <span className="num text-[12.5px] text-ink">{fmtLat(h.lat)} {fmtLon(h.lon)}
-                  <span className="ml-2 text-faint">D26 {Number.isFinite(h.d26) ? `${fmt(h.d26, 0)} m` : 'to floor'}</span></span>
-                <Link to={`/explorer?date=${day.date}&layer=tchp&probe=${h.lon.toFixed(2)},${h.lat.toFixed(2)}`} className="num text-[12.5px] text-heat hover:underline">
-                  {fmt(h.tchp, 0)} →
-                </Link>
-              </li>
-            ))}
-            {!hs.length && <li className="py-3 text-[12.5px] text-mute">No cell exceeds {THRESH} kJ cm⁻² on this day.</li>}
-          </ol>
-        </aside>
-      </section>
-
-      {series.length > 1 && (
-        <section className="page mt-20 print:hidden">
-          <p className="label">Across the exported days</p>
-          <table className="mt-4 w-full max-w-[720px] text-[12.5px]">
-            <thead><tr className="border-b border-line text-left"><th className="label pb-2 font-normal">Day</th>
-              {['BoB', 'AS'].map((r) => <th key={r} className="label pb-2 font-normal">{REGIONS[r].label}, share ≥ {THRESH}</th>)}</tr></thead>
-            <tbody>
-              {series.map((s) => (
-                <tr key={s.date} className={`border-b border-line ${s.date === date ? 'bg-wash' : ''}`}>
-                  <td className="num py-2.5 text-ink">{fmtDate(s.date)}</td>
-                  {['BoB', 'AS'].map((r) => (
-                    <td key={r} className="py-2.5 pr-6">
-                      <div className="flex items-center gap-3">
-                        <span className="h-[5px] flex-1 bg-line"><span className="block h-full bg-heat" style={{ width: `${s.st[r].share * 100}%` }} /></span>
-                        <span className="num w-10 text-right text-ink2">{Math.round(s.st[r].share * 100)} %</span>
-                      </div>
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
+        <h3 className="mt-10 text-[15px] text-ink">The rules</h3>
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full min-w-[820px] text-[12.5px]">
+            <thead><tr className="border-b border-line text-left">{['Driver', 'Scores 0 at', 'Scores 1 at', 'Weight', 'Why', 'Source'].map((h) => <th key={h} className="label py-2 pr-4 font-normal">{h}</th>)}</tr></thead>
+            <tbody>{RULES.map((r) => <tr key={r.key} className="border-b border-line align-top">
+              <td className="py-2 pr-4 text-ink">{r.label}</td><td className="num py-2 pr-4">{r.lo} {r.unit}</td><td className="num py-2 pr-4">{r.hi} {r.unit}</td>
+              <td className="num py-2 pr-4">{r.w.toFixed(2)}</td><td className="py-2 pr-4 text-ink2">{r.why}</td><td className="py-2 pr-4 text-mute">{r.ref}</td></tr>)}</tbody>
           </table>
-        </section>
-      )}
+          <p className="mt-2 text-[11.5px] text-faint">Categories: {CATS.slice().reverse().map((c) => `${c.label} ≥ ${c.min}`).join(' · ')}. A driver missing on a day (e.g. late salinity) is left out and the weights are rescaled.</p>
+        </div>
 
-      <section className="page mt-20">
-        <div className="grid gap-8 border-t border-line pt-8 md:grid-cols-[220px_1fr]">
-          <div>
-            <p className="label">Daily bulletin · draft</p>
-            <div className="mt-4 flex gap-3 print:hidden">
-              <button onClick={() => window.print()} className="btn">Print</button>
-              <button onClick={() => navigator.clipboard?.writeText(text.join('\n\n'))} className="btn">Copy text</button>
+        {/* ================================================ bulletin */}
+        <SectionHead id="bulletin" className="scroll-mt-28 pt-16" label="04 · Bulletin" title="Numbers in, words out">
+          The bulletin below is written by a fixed template. The next step hands the same structured numbers to a language model (DeepSeek) with the
+          prompt shown, so it can word the bulletin for forecasters. It never sees maps, never computes anything and is told to use only these numbers.
+        </SectionHead>
+        <div className="mt-6 rounded-[12px] border border-line bg-white/70">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-2.5">
+            <div className="seg">{[...(llm ? [['llm', 'DeepSeek bulletin']] : []), ['text', 'Template bulletin'], ['json', 'LLM input (JSON)'], ['prompt', 'LLM prompt']].map(([k, l]) =>
+              <button key={k} aria-pressed={view === k} onClick={() => setView(k)}>{l}</button>)}</div>
+            <div className="flex items-center gap-4">
+              <span className="inline-flex items-center gap-1.5 text-[11.5px] text-mute"><span className={`h-1.5 w-1.5 rounded-full ${llm ? 'bg-[#4D9F6A]' : 'bg-[#E0A526]'}`} />{llmState}</span>
+              <CopyBtn text={view === 'llm' && llm ? llm.text : view === 'json' ? json : view === 'prompt' ? `${PROMPT}\n\n${json}` : text.join('\n\n')} />
             </div>
           </div>
-          <article className="max-w-[64ch]">
-            <h2 className="display text-[26px] leading-tight">Ocean heat bulletin, {fmtDate(day.date, true)}</h2>
-            {text.map((t, i) => <p key={i} className="mt-4 text-[15px] leading-relaxed text-ink2">{t}</p>)}
-            <p className="mt-6 text-[11.5px] text-faint">
-              Written by a fixed template from the numbers on this page: every figure is computed, nothing is generated by a language model.
-              For operational use, verify against INCOIS and IMD products.
-            </p>
-          </article>
+          {view === 'llm' && llm && <div className="whitespace-pre-line px-5 py-5 text-[14px] leading-relaxed text-ink2">{llm.text}
+            <p className="mt-3 text-[11px] text-faint">Worded by {llm.model} from the JSON input; every number was checked against it.</p></div>}
+          {view === 'text' && <div className="space-y-3 px-5 py-5 text-[14px] leading-relaxed text-ink2">{text.map((t, i) => <p key={i} className={i ? '' : 'font-medium text-ink'}>{t}</p>)}</div>}
+          {view === 'json' && <pre className="num max-h-[520px] overflow-auto bg-[#0F172A] px-5 py-4 text-[11.5px] leading-relaxed text-[#E2E8F0]">{json}</pre>}
+          {view === 'prompt' && <pre className="num whitespace-pre-wrap px-5 py-4 text-[12.5px] leading-relaxed text-ink">{PROMPT}{'\n\n<JSON input>'}</pre>}
         </div>
-      </section>
+        <p className="mt-3 text-[11.5px] text-faint">Every number is computed in the browser from the published prediction. For operational decisions use IMD and INCOIS advisories.
+          More on the method in the <Link className="link" to="/docs">Docs</Link>.</p>
+      </div>
     </div>
   )
 }
