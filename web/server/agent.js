@@ -45,8 +45,33 @@ Rules:
 - Be specific and short: 2–6 sentences or a compact list. Use units. No marketing language.
 FACTS:${FACTS}`
 
-export async function answer({ question, context, history = [] }, key) {
+const BULLETIN = `You write the daily ocean-heat bulletin of the Sylithe Ocean Model for cyclone forecasters.
+Use ONLY the numbers in the JSON below; never invent, round differently or add numbers.
+Do not forecast cyclone genesis, track, intensity or landfall: the data describe the ocean only;
+vertical wind shear, humidity and other atmospheric conditions are not assessed.
+Write 120–180 words: a one-line headline, then Bay of Bengal, Arabian Sea, hotspots
+(with coordinates and their strongest drivers), any disturbance-over-warm-ocean watch points,
+the 7-day change, and the caveats listed in the JSON.
+End with "Watch next:" and two short, specific suggestions for forecasters, each tied to a hotspot,
+watch point or trend in the JSON (e.g. which coordinates to monitor and why).
+Plain text with short **bold** section labels; no tables.`
+
+async function deepseek(messages, key, max_tokens = 700) {
+  const r = await fetch(API, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+    body: JSON.stringify({ model: MODEL, messages, temperature: 0.2, max_tokens }),
+  })
+  if (!r.ok) return { status: 502, body: { error: 'upstream', message: `DeepSeek returned ${r.status}` } }
+  const j = await r.json()
+  return { status: 200, body: { answer: j.choices?.[0]?.message?.content?.trim() ?? '', model: MODEL } }
+}
+
+export async function answer({ question, context, history = [], task, payload }, key) {
   if (!key) return { status: 503, body: { error: 'no_key', message: 'DEEPSEEK_API_KEY is not set on the server.' } }
+  if (task === 'bulletin') {
+    if (!payload || typeof payload !== 'object') return { status: 400, body: { error: 'bad_payload' } }
+    return deepseek([{ role: 'system', content: BULLETIN }, { role: 'user', content: JSON.stringify(payload).slice(0, 20000) }], key, 1200)
+  }
   if (!question || typeof question !== 'string' || question.length > 2000) return { status: 400, body: { error: 'bad_question' } }
   const ctx = JSON.stringify(context ?? {}).slice(0, 24000)
   const messages = [
@@ -55,13 +80,7 @@ export async function answer({ question, context, history = [] }, key) {
       .map((m) => ({ role: m.role, content: m.content.slice(0, 4000) })),
     { role: 'user', content: question },
   ]
-  const r = await fetch(API, {
-    method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-    body: JSON.stringify({ model: MODEL, messages, temperature: 0.2, max_tokens: 700 }),
-  })
-  if (!r.ok) return { status: 502, body: { error: 'upstream', message: `DeepSeek returned ${r.status}` } }
-  const j = await r.json()
-  return { status: 200, body: { answer: j.choices?.[0]?.message?.content?.trim() ?? '', model: MODEL } }
+  return deepseek(messages, key)
 }
 
 /** Node request handler shared by the Vite middleware and the Vercel function. */

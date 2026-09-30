@@ -142,3 +142,27 @@ export function ocpiOfRecord(r) {
 }
 
 export { isothermDepth, mld, tchp }
+
+function* numbersIn(o) {
+  if (Array.isArray(o)) for (const v of o) yield* numbersIn(v)
+  else if (o && typeof o === 'object') for (const v of Object.values(o)) yield* numbersIn(v)
+  else if (typeof o === 'number') yield o
+  else if (typeof o === 'string') for (const m of o.matchAll(/\d+(?:\.\d+)?/g)) yield +m[0]
+}
+
+/** Numbers in an agent's text that cannot be traced to the payload, compared at the precision they are written with
+ *  (shares may appear as percentages; small integers and the date's parts are allowed as labels). Mirrors oceanembed/bulletin.py. */
+export function untraced(text, payload) {
+  const vals = [...numbersIn(payload)].map(Math.abs)
+  const [y, mo, d] = payload.date.split('-').map(Number)
+  const labels = new Set([...Array(11).keys(), y, mo, d])
+  const round = (v, k) => Math.round(v * 10 ** k) / 10 ** k
+  const bad = []
+  for (const m of text.matchAll(/\d+(?:\.\d+)?/g)) {
+    const s = m[0], v = +s, k = s.includes('.') ? s.split('.')[1].length : 0
+    if (k === 0 && labels.has(v)) continue
+    if (vals.some((p) => round(p, k) === v || round(p * 100, k) === v)) continue
+    bad.push(s)
+  }
+  return bad
+}

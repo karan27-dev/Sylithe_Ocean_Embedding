@@ -11,7 +11,7 @@ import { ALERT, catName, useCyclones } from '../lib/gdacs'
 import { SectionHead } from '../components/ui'
 import { level, useDay, useJSON, useManifest } from '../lib/data'
 import { DEPTHS, REGIONS, derived, fmt, fmtDate, fmtLat, fmtLon, layerGrid, robustRange } from '../lib/ocean'
-import { CATS, RULES, VORT, WIND, catOf, drivers, features, ocpiOfRecord, peaks, regionSummary, t100 } from '../lib/cyclone'
+import { CATS, RULES, VORT, WIND, catOf, drivers, features, ocpiOfRecord, peaks, regionSummary, t100, untraced } from '../lib/cyclone'
 
 const LIVE = import.meta.env.VITE_LIVE_BASE || 'https://raw.githubusercontent.com/karan27-dev/Sylithe_Ocean_Embedding/live-data/web'
 const REPLAY = '/data/ops'
@@ -117,6 +117,7 @@ export default function Cyclone() {
   const [region, setRegion] = useState('BoB')
   const [depthK, setDepthK] = useState(DEPTHS.indexOf(100))
   const [view, setView] = useState(null)
+  const [agentText, setAgentText] = useState({})          // date → { state: 'writing' | 'ok' | 'none', text }
 
   useEffect(() => { if (m && (!date || !m.days.some((d) => d.date === date))) setDate(m.days[m.days.length - 1].date) }, [m, date])
   const day = useDay(m, date)
@@ -149,6 +150,22 @@ export default function Cyclone() {
   const watch = useMemo(() => (f && fW ? peaks(m, f.ocpi, { k: 5, sep: 3, min: 0.5, keep: (i) => fW.vort[i] > VORT && fW.wind[i] >= WIND })
     .map((p) => ({ ...p, ocpi: p.v, vort: fW.vort[p.i], wind: fW.wind[p.i] })) : []), [f, fW, m])
 
+  // the Sylithe agent words today's bulletin live (DeepSeek via /api/agent); numbers are checked before it is shown
+  const payloadKey = m && day && series && f && sum ? date : null
+  useEffect(() => {
+    if (!payloadKey || agentText[payloadKey]) return
+    const recs0 = Object.fromEntries(RS.map((r) => [r, series.days[date]?.[r]]))
+    const prev0 = Object.fromEntries(RS.map((r) => [r, series.days[addDays(date, -7)]?.[r]]))
+    const p = buildPayload({ date, live, run: index?.runs?.[date], sum, recs: recs0, prev: prev0, hs, watch, dayObj: day, m })
+    setAgentText((a) => ({ ...a, [date]: { state: 'writing' } }))
+    fetch('/api/agent', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ task: 'bulletin', payload: p }) })
+      .then((r) => (r.ok ? r.json() : null)).catch(() => null)
+      .then((j) => {
+        const t = j?.answer
+        setAgentText((a) => ({ ...a, [date]: t && !untraced(t, p).length ? { state: 'ok', text: t, model: j.model } : { state: 'none' } }))
+      })
+  }, [payloadKey]) // eslint-disable-line react-hooks/exhaustive-deps
+
   if (!m || !day || !series || !f) return <div className="page min-h-[70vh] pt-16"><p className="label">Loading the live ocean state…</p></div>
 
   const run = index?.runs?.[date]
@@ -157,10 +174,11 @@ export default function Cyclone() {
   const payload = buildPayload({ date, live, run, sum, recs, prev, hs, watch, dayObj: day, m })
   const text = bulletinText(payload)
   const json = JSON.stringify(payload, null, 2)
-  const llm = bull?.llm?.text && bull.llm.checked && bull.date === date ? bull.llm : null
+  const live_ = agentText[date]
+  const llm = live_?.state === 'ok' ? { text: live_.text, model: live_.model }
+    : bull?.llm?.text && bull.llm.checked && bull.date === date ? bull.llm : null
   const bView = view ?? (llm ? 'llm' : 'text')
-  const llmState = llm ? 'Sylithe agent (DeepSeek) · numbers verified' : bull?.llm?.error ? 'DeepSeek call failed · template shown'
-    : bull?.llm && !bull.llm.checked ? 'DeepSeek answer rejected by the number check · template shown' : 'DeepSeek: add DEEPSEEK_API_KEY to switch on'
+  const llmState = llm ? 'Sylithe agent (DeepSeek) · numbers verified' : live_?.state === 'writing' ? 'Sylithe agent is writing…' : null
   const z = DEPTHS[depthK]
   const rr = (grid, sym) => grid && robustRange(grid, sym)
   const regionRec = recs[region]
@@ -241,8 +259,8 @@ export default function Cyclone() {
                   potential is High today. (b) Cyclones reported by GDACS (JTWC tracks): solid = observed, hollow = official forecast.</p>
               </section>
               {/* ---------------- Sylithe agent bulletin */}
-              <section id="bulletin" className="mt-4 scroll-mt-28 rounded-[12px] border border-[#EBDCCB] bg-[#FAF0E6]/60">
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#EBDCCB] px-5 py-3">
+              <section id="bulletin" className="mt-4 scroll-mt-28 rounded-[12px] border border-[#E5E7EB] bg-[#F5F5F4]">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#E5E7EB] px-5 py-3">
                   <div className="flex items-center gap-2.5">
                     <img src="/sylithe-logo.png" alt="" className="h-6 w-6" />
                     <div><p className="text-[14.5px] font-medium text-ink">Sylithe agent · ocean bulletin for {fmtDate(bull?.date ?? date)}</p>
@@ -251,14 +269,14 @@ export default function Cyclone() {
                   <div className="flex items-center gap-4">
                     <div className="seg">{[...(llm ? [['llm', 'Sylithe agent']] : []), ['text', 'Template'], ['json', 'Data (JSON)']].map(([k, l]) =>
                       <button key={k} aria-pressed={bView === k} onClick={() => setView(k)}>{l}</button>)}</div>
-                    <span className="hidden items-center gap-1.5 text-[11.5px] text-mute md:inline-flex"><span className={`h-1.5 w-1.5 rounded-full ${llm ? 'bg-[#4D9F6A]' : 'bg-[#E0A526]'}`} />{llmState}</span>
+                    {llmState && <span className="hidden items-center gap-1.5 text-[11.5px] text-mute md:inline-flex"><span className={`h-1.5 w-1.5 rounded-full ${llm ? 'bg-[#4D9F6A]' : 'animate-pulse bg-[#E0A526]'}`} />{llmState}</span>}
                     <CopyBtn text={bView === 'llm' && llm ? llm.text : bView === 'json' ? json : text.join('\n\n')} />
                   </div>
                 </div>
                 {bView === 'llm' && llm && <div className="px-5 py-4 text-[14px] leading-relaxed text-ink2">{rich(llm.text)}</div>}
                 {bView === 'text' && <div className="space-y-2.5 px-5 py-4 text-[14px] leading-relaxed text-ink2">{text.map((t, i) => <p key={i} className={i ? '' : 'font-medium text-ink'}>{t}</p>)}</div>}
                 {bView === 'json' && <pre className="num max-h-[460px] overflow-auto rounded-b-[12px] bg-[#0F172A] px-5 py-4 text-[11.5px] leading-relaxed text-[#E2E8F0]">{json}</pre>}
-                <p className="border-t border-[#EBDCCB] px-5 py-2.5 text-[11px] text-faint">Ocean conditions only, not a cyclone forecast. For operational decisions use IMD and INCOIS advisories.</p>
+                <p className="border-t border-[#E5E7EB] px-5 py-2.5 text-[11px] text-faint">Ocean conditions only, not a cyclone forecast. For operational decisions use IMD and INCOIS advisories.</p>
               </section>
             </div>
           )
