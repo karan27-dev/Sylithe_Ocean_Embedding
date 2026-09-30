@@ -65,6 +65,7 @@ jobs:
         env:
           COPERNICUSMARINE_SERVICE_USERNAME: ${{ secrets.CMEMS_USER }}
           COPERNICUSMARINE_SERVICE_PASSWORD: ${{ secrets.CMEMS_PASS }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}     # optional: words the cyclone bulletin
         run: python -m oceanembed.live run --state state --models models
 
       - name: Publish to the live-data branch

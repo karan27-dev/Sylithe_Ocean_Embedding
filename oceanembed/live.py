@@ -365,6 +365,11 @@ def run(state_dir: str, models_dir: str, stats_path: str | None = None, today: s
                 days[-MAP_DAYS] if len(days) >= MAP_DAYS else "0000")
     state.save()
     export_web(state, S, log)
+    try:                                   # cyclone bulletin (DeepSeek wording when DEEPSEEK_API_KEY is set)
+        from .bulletin import write as write_bulletin
+        write_bulletin(state.root, log)
+    except Exception as e:
+        log(f"  bulletin skipped ({e!r})")
     log(f"live run done in {time.time() - t0:.0f} s · latest prediction {state.status['last_predicted']}")
     return state
 
