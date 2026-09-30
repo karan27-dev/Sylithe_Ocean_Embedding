@@ -98,14 +98,7 @@ export default function Explorer() {
             </Side>
           </div>
 
-          <div className="border-t border-line bg-[#FAF6F0] px-4 py-3">
-            <div className="flex items-center justify-between gap-2">
-              <p className="truncate text-[12px] text-ink">{layer.label}{layer.perDepth ? ` at ${z} m` : ''} · <span className="num text-mute">{day ? fmtDate(day.date) : ''}</span></p>
-              <button onClick={() => setVisible((x) => !x)} title={visible ? 'Hide the layer' : 'Show the layer'} className="text-mute hover:text-ink">
-                {visible ? <Eye size={15} /> : <EyeOff size={15} />}</button>
-            </div>
-            {range && <Legend className="mt-2" layer={layer} range={range} width="100%" marks={MARKS[layer.id] ?? []} />}
-            {layer.perDepth && <DepthPicker depths={DEPTHS} k={v.depth} onChange={(k) => v.set({ depth: k })} />}
+          <div className="border-t border-line bg-[#FAF6F0] px-4 pb-3 pt-0.5">
             <CursorReadout bind={hoverRef} layer={layer} depth={z} />
           </div>
           <button onClick={toAnalysis} className="flex items-center justify-center gap-2 border-t border-[#D5DAE0] bg-[#EEF0F2] px-4 py-3 text-[13px] text-[#334155] hover:bg-[#E2E6EA]">
@@ -115,6 +108,15 @@ export default function Explorer() {
         <div className="relative h-[70vh] min-w-0 flex-1 lg:h-auto">
           <OceanMap g={m.grid} url={url} grid={grid} probe={probeCell} onPick={pick} onHover={(c) => hoverRef.current?.(c)} region={v.region}
             basemap={v.basemap} opacity={visible ? opacity : 0} padding={[24, 24]} scrollZoom />
+          <div className="absolute left-3 top-3 z-[700] w-[258px] border border-line bg-paper/95 px-3 py-2.5 shadow-sm backdrop-blur">
+            <div className="flex items-center justify-between gap-2">
+              <p className="truncate text-[11.5px] text-ink">{layer.label}{layer.perDepth ? ` at ${z} m` : ''} · <span className="num text-mute">{day ? fmtDate(day.date) : ''}</span></p>
+              <button onClick={() => setVisible((x) => !x)} title={visible ? 'Hide the layer' : 'Show the layer'} className="text-mute hover:text-ink">
+                {visible ? <Eye size={14} /> : <EyeOff size={14} />}</button>
+            </div>
+            {range && <Legend className="mt-1.5" layer={layer} range={range} width="100%" marks={MARKS[layer.id] ?? []} />}
+            {layer.perDepth && <DepthPicker depths={DEPTHS} k={v.depth} onChange={(k) => v.set({ depth: k })} />}
+          </div>
           <div className="absolute right-14 top-3 z-[700] flex gap-1.5">
             <MapBtn on={visible} onClick={() => setVisible((x) => !x)} title={visible ? 'Hide the layer' : 'Show the layer'}>
               {visible ? <Eye size={14} /> : <EyeOff size={14} />}{layer.short ?? layer.label}</MapBtn>

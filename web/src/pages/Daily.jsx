@@ -328,15 +328,7 @@ export default function Daily() {
             )}
           </div>
 
-          <div className="border-t border-line bg-[#FAF6F0] px-4 py-3">
-            <div className="flex items-center justify-between gap-2">
-              <p className="truncate text-[12px] text-ink">{L_.label}{L_z} · <span className="num text-mute">{fmtDate(date)}</span></p>
-              <button onClick={() => setVisible((v) => !v)} title={visible ? 'Hide the layer' : 'Show the layer'} className="text-mute hover:text-ink">
-                {visible ? <Eye size={15} /> : <EyeOff size={15} />}</button>
-            </div>
-            {crange ? <Legend className="mt-2" layer={L_} range={crange} width="100%" marks={layer === 'tchp' ? [{ v: 50, label: '50 kJ cm⁻²' }] : []} />
-              : <p className="mt-1 text-[11px] text-mute">{mapped.includes(date) ? 'Loading…' : `No map for this day: maps cover the last ${mapped.length} days.`}</p>}
-            {L_.perDepth && <DepthPicker depths={DEPTHS} k={depthK} onChange={setDepthK} />}
+          <div className="border-t border-line bg-[#FAF6F0] px-4 pb-3 pt-0.5">
             <CursorReadout bind={hoverRef} layer={L_} depth={z} />
           </div>
           <button onClick={toAnalysis} className="flex items-center justify-center gap-2 border-t border-[#D5DAE0] bg-[#EEF0F2] px-4 py-3 text-[13px] text-[#334155] hover:bg-[#E2E6EA]">
@@ -350,6 +342,16 @@ export default function Daily() {
               <AoiTools aoi={isCustom ? aoi : null} mode={draw} onDone={onDrawn} color="#F8FAFC" />
             </OceanMap>
           )}
+          <div className="absolute left-3 top-3 z-[700] w-[258px] border border-line bg-paper/95 px-3 py-2.5 shadow-sm backdrop-blur">
+            <div className="flex items-center justify-between gap-2">
+              <p className="truncate text-[11.5px] text-ink">{L_.label}{L_z} · <span className="num text-mute">{fmtDate(date)}</span></p>
+              <button onClick={() => setVisible((x) => !x)} title={visible ? 'Hide the layer' : 'Show the layer'} className="text-mute hover:text-ink">
+                {visible ? <Eye size={14} /> : <EyeOff size={14} />}</button>
+            </div>
+            {crange ? <Legend className="mt-1.5" layer={L_} range={crange} width="100%" marks={layer === 'tchp' ? [{ v: 50, label: '50 kJ cm⁻²' }] : []} />
+              : <p className="mt-1 text-[11px] text-mute">{mapped.includes(date) ? 'Loading…' : `No map for this day: maps cover the last ${mapped.length} days.`}</p>}
+            {L_.perDepth && <DepthPicker depths={DEPTHS} k={depthK} onChange={setDepthK} />}
+          </div>
           <div className="absolute right-14 top-3 z-[700] flex flex-wrap justify-end gap-1.5">
             <MapBtn on={visible} onClick={() => setVisible((v) => !v)} title={visible ? 'Hide the layer' : 'Show the layer'}>
               {visible ? <Eye size={14} /> : <EyeOff size={14} />}{L_.short ?? L_.label}</MapBtn>

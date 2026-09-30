@@ -63,12 +63,12 @@ export function DepthPicker({ depths, k, onChange }) {
     <div className="mt-2.5">
       <div className="flex items-center justify-between">
         <span className="label">Depth</span>
-        <select value={k} onChange={(e) => onChange(+e.target.value)} className="h-6 rounded-[5px] border border-line bg-paper px-1.5 text-[11.5px] text-ink">
+        <select value={k} onChange={(e) => onChange(+e.target.value)} className="h-6 border border-line bg-paper px-1 text-[11px] text-ink">
           {depths.map((d, j) => <option key={d} value={j}>{d} m</option>)}</select>
       </div>
-      <div className="seg mt-1.5 flex w-full">
+      <div className="seg mt-1.5 flex w-full !rounded-none">
         {QUICK.map((d) => { const j = depths.indexOf(d); return (
-          <button key={d} className="num flex-1 !px-0 text-[11px]" aria-pressed={k === j} onClick={() => onChange(j)}>{d}</button>) })}
+          <button key={d} className="num flex-1 !h-6 !rounded-none !px-0 text-[10.5px]" aria-pressed={k === j} onClick={() => onChange(j)}>{d}</button>) })}
       </div>
     </div>
   )
