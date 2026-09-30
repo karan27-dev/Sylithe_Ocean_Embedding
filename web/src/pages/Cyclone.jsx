@@ -137,6 +137,13 @@ export default function Cyclone() {
   const d = useMemo(() => (m && day ? derived(m, day) : null), [m, day])
   const sum = useMemo(() => (m && day ? regionSummary(m, day) : null), [m, day])
   const hs = useMemo(() => (f ? peaks(m, f.ocpi, { k: 6, sep: 4, min: 0.5 }) : []), [f, m])
+  // outlook in the timeline always starts from the newest predicted day
+  const lastDate = m?.days.at(-1)?.date ?? null
+  const lastDay = useDay(m, date !== lastDate ? lastDate : null)
+  const latestHs = useMemo(() => {
+    const dd = date === lastDate ? day : lastDay
+    return m && dd ? peaks(m, features(m, dd).ocpi, { k: 3, sep: 4, min: 0.5 }) : []
+  }, [m, day, lastDay, date, lastDate])
   const wDay = day?.uw ? day : windDay
   const fW = useMemo(() => (m && wDay ? features(m, wDay) : null), [m, wDay])
   const vort5 = useMemo(() => fW && fW.vort.map((v) => v * 1e5), [fW])
@@ -225,10 +232,13 @@ export default function Cyclone() {
                     : <>No active cyclone in the North Indian Ocean (GDACS, checked just now).{cyc.list.length ? ` Recent: ${cyc.list.map((c) => `${c.name} (${fmtDate(c.from.slice(0, 10))}–${fmtDate(c.to.slice(0, 10))})`).join(', ')}.` : ''}</>}</p>
                 </div>
               )}
-              <section className="rounded-[12px] border border-line bg-white/70 p-4 sm:p-5">
-                <p className="mb-2 font-display text-[15px] text-ink">Cyclone potential and cyclones, day by day</p>
-                <CycloneTimeline dates={dates} today={today} cyclones={cyc.list}
+              <section className="rounded-[12px] border border-line bg-white p-4 sm:p-5">
+                <CycloneTimeline dates={dates} today={today} cyclones={cyc.list} hotspots={latestHs}
                   lines={RS.map((r) => ({ label: REGIONS[r].label, color: RCOL[r], dashed: r === 'NIO', values: vals(ocpiOfRecord)(r) }))} />
+                <p className="mt-3 border-t border-line pt-3 text-[12.5px] leading-relaxed text-ink2"><span className="font-medium text-ink">Figure 0. Cyclone potential and cyclones, day by day.</span> (a) OCPI of each basin's
+                  area-mean conditions over every predicted day; dots every third day. Beyond the newest satellite day the ocean has not been observed yet, so the
+                  shaded band shows a persistence outlook (the latest value carried forward, since upper-ocean heat changes over weeks) and the coordinates where
+                  potential is High today. (b) Cyclones reported by GDACS (JTWC tracks): solid = observed, hollow = official forecast.</p>
               </section>
             </div>
           )
@@ -236,14 +246,14 @@ export default function Cyclone() {
 
         <div className="mt-8 grid items-stretch gap-2 md:grid-cols-[1.2fr_auto_1fr_auto_1.2fr_auto_1.2fr_auto_1fr]">
           {[
-            ['#inputs', '01 · Satellite input', 'SST · SSS · SLA · currents · winds', 'bg-paper'],
-            ['#outputs', '02 · Sylithe Ocean Model', '3-model ensemble, 15-day window', 'bg-ink text-paper'],
-            ['#outputs', '03 · Ocean state', 'T 0–1000 m · TCHP · T100 · D26 · MLD', 'bg-paper'],
-            ['#potential', '04 · Cyclone logic', 'OCPI · hotspots · disturbance watch', 'bg-[#A3E635]/25'],
-            ['#bulletin', '05 · LLM bulletin', 'DeepSeek, words only, number-checked', 'border-dashed bg-paper'],
+            ['#inputs', '01 · Satellite input', 'SST · SSS · SLA · currents · winds', ''],
+            ['#outputs', '02 · Sylithe Ocean Model', '3-model ensemble, 15-day window', ''],
+            ['#outputs', '03 · Ocean state', 'T 0–1000 m · TCHP · T100 · D26 · MLD', ''],
+            ['#potential', '04 · Cyclone logic', 'OCPI · hotspots · disturbance watch', ''],
+            ['#bulletin', '05 · LLM bulletin', 'DeepSeek, words only, number-checked', ''],
           ].flatMap(([href, t, s, cls], i) => [
             i > 0 ? <ArrowRight key={`a${i}`} size={16} className="hidden self-center text-mute md:block" /> : null,
-            <a key={t} href={href} className={`rounded-[10px] border border-line px-3 py-2.5 transition-colors hover:border-ink ${cls}`}>
+            <a key={t} href={href} className={`rounded-[10px] border border-[#EBDCCB] bg-[#FAF0E6] px-3 py-2.5 text-ink transition-colors hover:border-[#D9722B] ${cls}`}>
               <p className="text-[12.5px] font-medium">{t}</p><p className="mt-0.5 text-[11px] opacity-70">{s}</p></a>,
           ]).filter(Boolean)}
         </div>
