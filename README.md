@@ -36,6 +36,8 @@ Smart India Hackathon 2026 · Problem Statement **26066** · Ministry of Earth S
 | **Live** | Runs every 6 h on GitHub Actions: new satellite day → prediction within hours; re-predicted when late inputs arrive |
 | **Applications** | Cyclone heat potential, Ocean Cyclone Potential Index, disturbance watch, GDACS cyclone alerts, LLM-worded bulletins |
 
+> 📄 **Research paper:** [Sylithe Ocean Model — full paper (PDF)](docs/paper/Sylithe_Ocean_Model_paper.pdf) · Karan Singh, Sneha Pal, Ankush Singh, Mehwish Siddiquie, Nitin Singh, Sudhirkumar Yadav (TCET Mumbai)
+
 ## Contents
 
 1. [The problem](#1-the-problem)

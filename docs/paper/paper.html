@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Sylithe Ocean Model — research paper</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=Space+Grotesk:wght@500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+  onload="renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'\\(',right:'\\)',display:false}]});document.body.dataset.ready='1'"></script>
+<style>
+  @page { size: A4; margin: 17mm 15mm 18mm 15mm; }
+  :root { --ink:#111827; --mute:#4B5563; --line:#D1D5DB; --accent:#1F6F6A; --orange:#C2702E; }
+  * { box-sizing: border-box; }
+  html { font-size: 9.6pt; }
+  body { margin:0; color:var(--ink); font-family:'Source Serif 4', Georgia, serif; line-height:1.42; text-align:justify; hyphens:auto; }
+  .head { text-align:center; margin-bottom:10pt; }
+  .journal { display:flex; justify-content:space-between; font-family:'Space Grotesk',sans-serif; font-size:7.6pt; color:var(--mute); border-bottom:1.2pt solid var(--ink); padding-bottom:4pt; margin-bottom:14pt; letter-spacing:.02em; }
+  .journal img { height:14pt; vertical-align:middle; margin-right:5pt; }
+  h1.title { font-size:17.5pt; line-height:1.18; margin:0 0 10pt; font-weight:700; text-align:center; }
+  .authors { font-size:10.5pt; margin-bottom:4pt; }
+  .affil { font-size:8.4pt; color:var(--mute); line-height:1.35; }
+  .corr { font-size:8.4pt; color:var(--mute); margin-top:3pt; }
+  .dates { font-size:7.8pt; color:var(--mute); margin-top:6pt; }
+  .abstract { border-top:.6pt solid var(--line); border-bottom:.6pt solid var(--line); padding:8pt 0 9pt; margin:10pt 0 12pt; font-size:9.3pt; }
+  .abstract b.lbl { font-family:'Space Grotesk',sans-serif; font-size:8.6pt; letter-spacing:.04em; text-transform:uppercase; margin-right:6pt; }
+  .keywords { margin-top:6pt; font-size:8.6pt; color:var(--mute); }
+  .cols { column-count:2; column-gap:7mm; }
+  h2 { font-family:'Space Grotesk',sans-serif; font-size:10.6pt; margin:12pt 0 5pt; break-after:avoid; }
+  h3 { font-size:9.8pt; font-style:italic; font-weight:600; margin:9pt 0 3pt; break-after:avoid; }
+  p { margin:0 0 5pt; text-indent:1.2em; }
+  h2 + p, h3 + p, .noind { text-indent:0; }
+  figure { margin:8pt 0 9pt; break-inside:avoid; }
+  figure.wide { column-span:all; margin:10pt 0 12pt; }
+  figure img { width:100%; display:block; border:0; }
+  figcaption { font-size:8.2pt; line-height:1.35; margin-top:4pt; text-align:justify; }
+  figcaption b { font-family:'Space Grotesk',sans-serif; font-weight:600; }
+  table { width:100%; border-collapse:collapse; font-size:7.9pt; margin:3pt 0 2pt; text-align:left; }
+  caption { caption-side:top; text-align:justify; font-size:8.2pt; margin-bottom:4pt; }
+  caption b { font-family:'Space Grotesk',sans-serif; font-weight:600; }
+  thead th { border-top:1pt solid var(--ink); border-bottom:.6pt solid var(--ink); padding:3pt 4pt; font-weight:600; }
+  tbody td { padding:2.4pt 4pt; border-bottom:.3pt solid #E5E7EB; }
+  tbody tr:last-child td { border-bottom:1pt solid var(--ink); }
+  td.n, th.n { text-align:right; font-variant-numeric:tabular-nums; }
+  tr.ours td { background:#FDF1E4; font-weight:600; }
+  .tbl { break-inside:avoid; margin:8pt 0 10pt; }
+  .tbl.wide { column-span:all; }
+  .katex { font-size:1.02em; }
+  .eq { break-inside:avoid; }
+  ul, ol { margin:2pt 0 6pt 1.2em; padding:0; } li { margin-bottom:2pt; }
+  .refs { font-size:8.1pt; line-height:1.34; }
+  .refs p { text-indent:-1.2em; padding-left:1.2em; margin-bottom:3pt; text-align:left; }
+  .box { border:.6pt solid var(--line); background:#F9FAFB; padding:6pt 8pt; margin:6pt 0 8pt; font-size:8.8pt; break-inside:avoid; }
+  a { color:var(--accent); text-decoration:none; }
+  .star { color:var(--orange); }
+</style>
+</head>
+<body>
+
+<div class="journal"><span><img src="../../web/public/sylithe-logo.png" alt="" />Sylithe Research · Technical Report SOM-2026-01</span><span>Smart India Hackathon 2026 · Problem Statement 26066 (MoES / INCOIS)</span></div>
+
+<div class="head">
+  <h1 class="title">Sylithe Ocean Model: an attention-enhanced embedding network for daily three-dimensional reconstruction of North Indian Ocean temperature from satellite observations, with near-real-time operation and cyclone applications</h1>
+  <div class="authors">Karan Singh<sup>1,*</sup>, Sneha Pal<sup>1</sup>, Ankush Singh<sup>1</sup>, Mehwish Siddiquie<sup>1</sup>, Nitin Singh<sup>1</sup> and Sudhirkumar Yadav<sup>1</sup></div>
+  <div class="affil"><sup>1</sup>Thakur College of Engineering and Technology (TCET), Mumbai, India</div>
+  <div class="corr"><sup>*</sup>Correspondence: Karan Singh (1032241432@tcetmumbai.in)</div>
+  <div class="dates">Technical report, 30 September 2026 · Code and live data: github.com/karan27-dev/Sylithe_Ocean_Embedding</div>
+</div>
+
+<div class="abstract">
+  <b class="lbl">Abstract</b>
+  Knowledge of the ocean's subsurface thermal structure underpins cyclone intensity forecasting, monsoon prediction, fisheries advisories and
+  naval acoustics, yet in the North Indian Ocean it is observed only by a few hundred Argo profiles per year. We present the Sylithe Ocean
+  Model, a deep-learning system that reconstructs daily temperature at 15 standard depths from the surface to 1000 m on a 0.25° grid
+  (5–30°N, 45–105°E) using only satellite observations of sea surface temperature, sea surface salinity, sea level anomaly, surface
+  currents and 10 m winds. The network couples a three-dimensional convolutional stem and temporal attention over a 15-day window with a
+  CBAM-attention encoder, whose deepest level is a 64-dimensional embedding of the ocean state pretrained as a masked autoencoder, and a
+  U-Net++ nested decoder that predicts a mean and a heteroscedastic variance at every cell and depth. It is trained against the GLORYS12
+  reanalysis on 2005–2021 with a β-negative-log-likelihood, a vertical-gradient and a surface-consistency loss, and three seeds are
+  averaged. On 2023, a year withheld from training, the ensemble reaches a root-mean-square error (RMSE) of 0.662 °C against GLORYS12
+  (41 % below climatology) and 0.757 °C against 9,469 independent Argo measurements. Evaluated on identical data, it outperforms the
+  published Attention 3D U-Net++ retrained here (0.762 °C), ridge regression (0.804 °C), climatology (0.952 °C) and the HYCOM GOFS 3.1
+  operational analysis (0.806 °C); paired bootstrap tests show the gain over the published architecture is significant below 200 m
+  (p = 0.003) and in the Bay of Bengal (p = 0.007). The model runs operationally every six hours on near-real-time inputs, re-predicts days
+  when late inputs arrive, and feeds an Ocean Cyclone Potential Index and a language-model bulletin whose numbers are verified against the
+  model output.
+  <div class="keywords"><b>Keywords:</b> ocean subsurface reconstruction; deep learning; U-Net++; attention; self-supervised learning; uncertainty; North Indian Ocean; tropical cyclone heat potential; near-real-time operations</div>
+</div>
+
+<div class="cols">
+
+<h2>1 Introduction</h2>
+<p class="noind">The upper ocean stores and releases the heat that shapes the South Asian monsoon and fuels tropical cyclones in the Bay of Bengal and
+the Arabian Sea. Cyclone intensification depends less on sea surface temperature (SST) than on the heat stored in the warm layer above the
+26 °C isotherm and on how much colder water a storm can mix to the surface (Leipper and Volgenau, 1972; Shay et al., 2000; Price, 2009).
+Satellites observe the surface daily and globally, but the interior is sampled directly only by Argo floats, research cruises and moorings,
+which leave most of the basin unobserved on any given day.</p>
+<p>Two families of methods bridge this gap. Ocean reanalyses such as GLORYS12 assimilate all available observations into a numerical model
+and deliver complete fields, but they are costly and released with delays of weeks to months. Statistical and machine-learning methods
+instead learn the relationship between surface observations and the subsurface from historical data. Early approaches used regression and
+empirical orthogonal functions; recent work uses neural networks, from multilayer perceptrons and random forests to convolutional, recurrent
+and transformer architectures. Among the most recent, Wang et al. (2026) introduced an Attention-enhanced 3D U-Net++ with transfer learning
+that reconstructs temperature and salinity in the north-western Pacific from SST and sea surface height.</p>
+<p>The Smart India Hackathon 2026 problem statement 26066, posed by the Ministry of Earth Sciences and INCOIS, asks for such a reconstruction for
+the North Indian Ocean: daily subsurface temperature at standard depths from satellite inputs, trained against GLORYS12 and verified with Argo.
+This region is demanding: the Bay of Bengal is strongly stratified by river and monsoon freshwater, forming barrier layers; the Arabian Sea
+has intense seasonal upwelling; and both basins host some of the world's most destructive cyclones.</p>
+<p>This paper makes four contributions. (i) An architecture that combines an embedding encoder, pretrained self-supervised on nineteen years
+of surface data, with a U-Net++ decoder that predicts anomalies from climatology together with a calibrated uncertainty. (ii) A fair
+benchmark against the published Attention 3D U-Net++, retrained on identical data, plus statistical baselines and an operational ocean model,
+with paired significance tests on independent Argo profiles. (iii) A near-real-time system that predicts each new satellite day and revises
+predictions as late inputs arrive. (iv) A transparent cyclone-support index and a language-model bulletin constrained to verified numbers.</p>
+
+<h2>2 Study area and data</h2>
+<h3>2.1 Domain and grid</h3>
+<p class="noind">The domain covers 5–30°N and 45–105°E (Fig. 1) on a regular 0.25° grid of 101 × 241 cells. Temperature is reconstructed at
+the 15 standard depths requested by the problem statement: 0, 5, 10, 20, 30, 50, 75, 100, 125, 150, 200, 300, 500, 700 and 1000 m. Two
+sub-regions are scored separately: the Bay of Bengal (BoB, 5–23°N, 80–100°E) and the Arabian Sea (AS, 5–25°N, 50–78°E).</p>
+
+<figure>
+  <img src="../../web/public/figures/fig01_domain.png" alt="" />
+  <figcaption><b>Figure 1.</b> Study domain on the 0.25° grid with the Arabian Sea and Bay of Bengal sub-regions and the 663 Argo profiles of 2023 used for independent validation.</figcaption>
+</figure>
+
+<h3>2.2 Satellite inputs</h3>
+<p class="noind">Seven daily input variables are used (Table 1). SST comes from the OSTIA level-4 analysis; sea surface salinity (SSS) from the
+Copernicus multi-observation SMOS/SMAP product; sea level anomaly (SLA) from the DUACS all-satellite altimetry product; surface currents (U, V)
+from OSCAR v2.0; and 10 m winds (U, V) from CCMP v3.1, averaged from six-hourly to daily. Every product is conservatively area-averaged to the
+0.25° grid, so that finer products are not aliased and coastal cells are not contaminated by land, and masked with the GLORYS12 ocean mask.
+In near-real-time operation, OSCAR and CCMP (released with long delays) are replaced by geostrophic currents from DUACS NRT and the
+ASCAT-blended wind analysis (Sect. 5).</p>
+
+<div class="tbl">
+<table>
+  <caption><b>Table 1.</b> Satellite input variables, training and near-real-time products.</caption>
+  <thead><tr><th>Variable</th><th>Training product</th><th>Live product</th><th>Delay</th></tr></thead>
+  <tbody>
+    <tr><td>SST</td><td>OSTIA L4 (moi-00168)</td><td>OSTIA NRT</td><td>~1 d</td></tr>
+    <tr><td>SSS</td><td>SMOS/SMAP multi-obs (moi-00051)</td><td>multi-obs NRT</td><td>~6 d</td></tr>
+    <tr><td>SLA</td><td>DUACS DT (moi-00145)</td><td>DUACS NRT</td><td>0 d</td></tr>
+    <tr><td>Currents U, V</td><td>OSCAR v2.0</td><td>DUACS geostrophic</td><td>0 d</td></tr>
+    <tr><td>Winds U, V</td><td>CCMP v3.1</td><td>ASCAT-blended L4</td><td>~1 d</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>2.3 Target, validation and reference data</h3>
+<p class="noind">The training target is the GLORYS12V1 reanalysis (1/12°, daily), averaged to 0.25° and vertically interpolated to the standard depths
+(one level below 1000 m is retained so that the deepest level is interpolated, not extrapolated). The period 2005–2023 is used: 2005 marks the
+start of the dense Argo era, when GLORYS12 is best constrained. Training uses 2005–2021, 2022 selects the checkpoint and 2023 is held out.
+Independent validation uses quality-controlled Argo temperature profiles from 2023 (663 profiles, 9,469 measurements after interpolation to the
+standard depths), matched to the nearest grid cell on the same day. HYCOM GOFS 3.1, an independent operational ocean analysis obtained through
+Google Earth Engine, serves as an external reference.</p>
+
+<h2>3 Methods</h2>
+<h3>3.1 Problem formulation</h3>
+<p class="noind">For a target day \(t\), the input is a window \(\mathbf{X}_t \in \mathbb{R}^{C \times W \times H \times L}\) of the \(W = 15\)
+preceding days, where each of the seven variables is given twice — as observed and as its anomaly from a 31-day-smoothed day-of-year mean —
+giving \(C = 14\) channels, accompanied by binary missing-value masks and five static channels (ocean mask, latitude, longitude,
+\(\sin\) and \(\cos\) of the day of year). The network predicts the temperature anomaly from the GLORYS12 day-of-year climatology
+\(\overline{T}(d, z)\), normalised per depth by its training standard deviation \(s_z\):</p>
+<div class="eq">$$\hat{T}(z) = \overline{T}(d_t, z) + s_z\,\mu_z(\mathbf{X}_t), \qquad \hat{\sigma}(z) = s_z\,\exp\!\big(\tfrac{1}{2}\,\ell_z(\mathbf{X}_t)\big),$$</div>
+<p class="noind">where \(\mu_z\) and \(\ell_z\) are the predicted mean and log-variance at depth \(z\). Predicting anomalies lets the network spend its
+capacity on eddies, Kelvin and Rossby waves and cyclone cold wakes rather than on the seasonal cycle.</p>
+
+<h3>3.2 Architecture</h3>
+<p class="noind">The architecture (Fig. 2) has four parts. A <i>three-dimensional stem</i> of two \(3\times3\times3\) convolutions with GELU mixes
+variables and neighbouring days. <i>Temporal attention</i> then collapses time with learned, cell-wise weights:</p>
+<div class="eq">$$\alpha_{\tau}(x,y) = \frac{\exp\big(\mathbf{w}^{\top}\mathbf{h}_{\tau}(x,y)\big)}{\sum_{\tau'} \exp\big(\mathbf{w}^{\top}\mathbf{h}_{\tau'}(x,y)\big)}, \quad \mathbf{h}(x,y)=\sum_{\tau}\alpha_{\tau}\,\mathbf{h}_{\tau}(x,y).$$</div>
+<p class="noind">A <i>CBAM encoder</i> of residual convolution blocks, each followed by channel and spatial attention (Woo et al., 2018), produces
+features at full, 1/2, 1/4 and 1/8 resolution with 32, 64, 128 and 256 channels; a \(1\times1\) projection of the deepest level forms the
+64-dimensional <i>embedding</i> \(\mathbf{z}\). A <i>U-Net++ nested decoder</i> (Zhou et al., 2018) computes nodes</p>
+<div class="eq">$$X^{i,j} = \mathcal{H}\Big(\big[\,X^{i,0},\dots,X^{i,j-1},\ \mathcal{U}(X^{i+1,j-1})\,\big]\Big), \quad j \ge 1,$$</div>
+<p class="noind">where \(\mathcal{H}\) is a CBAM convolution block and \(\mathcal{U}\) a transposed-convolution upsampling. Deep supervision averages
+three \(1\times1\) heads on \(X^{0,1}, X^{0,2}, X^{0,3}\), each producing 15 means and 15 log-variances (clamped to [−8, 6]). The network has
+about 2.4 million parameters at base width 32.</p>
+
+<figure class="wide">
+  <img src="../img/architecture.jpg" alt="" />
+  <figcaption><b>Figure 2.</b> Architecture of the Sylithe Ocean Model. A 15-day window of 14 surface channels passes a 3-D stem with temporal
+  attention and a CBAM encoder whose deepest level, projected to 64 channels, is the ocean-state embedding. The U-Net++ decoder with dense skip
+  paths and deep supervision outputs a mean and an uncertainty at 15 depths, added to the day-of-year climatology.</figcaption>
+</figure>
+
+<h3>3.3 Loss functions</h3>
+<p class="noind">The main term is the β-weighted negative log-likelihood (Seitzer et al., 2022), which learns the uncertainty without letting
+the network trade accuracy for inflated variance on hard cells:</p>
+<div class="eq">$$\mathcal{L}_{\beta} = \big\langle\, \mathrm{sg}\big[\sigma^{2\beta}\big]\Big(\frac{(y-\mu)^2}{2\sigma^2} + \tfrac{1}{2}\log\sigma^2\Big)\big\rangle, \quad \beta = 0.5,$$</div>
+<p class="noind">where sg denotes stop-gradient and the average runs over valid ocean cells and depths. A vertical-gradient term keeps the
+thermocline sharp, and a surface term enforces agreement between the 0 m prediction and the observed SST:</p>
+<div class="eq">$$\mathcal{L} = \mathcal{L}_{\beta} + 0.5\,\big\langle\big|\Delta_z\mu - \Delta_z y\big|^2\big\rangle + 0.1\,\big\langle\big|\hat{T}(0) - \mathrm{SST}\big|^2\big\rangle.$$</div>
+<p class="noind">No monotonicity constraint is imposed, since temperature inversions under the Bay of Bengal barrier layer are real.</p>
+
+<h3>3.4 Self-supervised pretraining</h3>
+<p class="noind">Before any subsurface label is used, the encoder is pretrained as a masked autoencoder (He et al., 2022) on the full surface record:
+half of the 16 × 16 patches of the last three days are hidden and whole variables are randomly dropped, and a light decoder reconstructs the
+last-day surface fields. Only the encoder is kept. This gives the embedding a representation of the surface ocean learned from all nineteen
+years, independent of the reanalysis.</p>
+
+<h3>3.5 Training</h3>
+<p class="noind">All layers are fine-tuned against GLORYS12 (Table 2). Training uses random 64 × 128 crops (the network is fully convolutional;
+validation and inference use the full domain padded to 112 × 256), AdamW with weight decay 0.05, an exponential moving average of the weights,
+mixed precision and early stopping on the 2022 validation RMSE. Variable dropout removes SSS, currents or winds with probability 0.3 so that
+the model remains usable when these arrive late. Three models are trained with seeds 42, 7 and 1234 (Fig. 3). The ensemble mean is the
+prediction; its variance combines the mean member variance and the spread of the member means:</p>
+<div class="eq">$$\mu = \tfrac{1}{M}\textstyle\sum_m \mu_m, \qquad \sigma^2 = \tfrac{1}{M}\textstyle\sum_m \sigma_m^2 + \tfrac{1}{M}\textstyle\sum_m (\mu_m - \mu)^2.$$</div>
+
+<div class="tbl">
+<table>
+  <caption><b>Table 2.</b> Training configuration.</caption>
+  <thead><tr><th>Setting</th><th>Value</th></tr></thead>
+  <tbody>
+    <tr><td>Window</td><td>15 days</td></tr>
+    <tr><td>Base width / levels / embedding</td><td>32 / 4 / 64</td></tr>
+    <tr><td>Optimiser</td><td>AdamW, lr 2×10⁻⁴, wd 0.05, cosine</td></tr>
+    <tr><td>Crops</td><td>64 × 128 cells</td></tr>
+    <tr><td>EMA decay</td><td>0.999 (with warm-up)</td></tr>
+    <tr><td>Variable dropout</td><td>0.3 (SSS, currents, winds)</td></tr>
+    <tr><td>Loss weights</td><td>β-NLL (β = 0.5), gradient 0.5, surface 0.1</td></tr>
+    <tr><td>Early stopping</td><td>patience 8 epochs</td></tr>
+    <tr><td>Ensemble</td><td>seeds 42, 7, 1234</td></tr>
+  </tbody>
+</table>
+</div>
+
+<figure>
+  <img src="../../web/public/figures/fig02_training_curves.png" alt="" />
+  <figcaption><b>Figure 3.</b> Validation RMSE against GLORYS12 for 2022 (EMA weights). The three Sylithe seeds reach their best checkpoints
+  (about 0.612–0.618 °C) within three to five epochs; the Attention 3D U-Net++ reaches about 0.619 °C after seven. Early stopping keeps the
+  best epoch of each run.</figcaption>
+</figure>
+
+<h3>3.6 Baselines</h3>
+<p class="noind">Four comparators are evaluated on the same grid, depths and test year. (i) The <i>Attention 3D U-Net++</i> of Wang et al. (2026),
+reimplemented with its published layout — the input window treated as the third dimension, spatial-only pooling and attention-enhanced
+nested skip paths — and retrained on our data with the same split, inputs and budget. (ii) <i>Ridge regression</i> per depth on local surface
+features. (iii) <i>Climatology</i>, the GLORYS12 day-of-year mean. (iv) <i>HYCOM GOFS 3.1</i>, an independent operational analysis. GLORYS12
+itself is also scored against Argo; because it assimilates Argo profiles, it is a reference rather than a competitor.</p>
+
+<h3>3.7 Evaluation metrics</h3>
+<p class="noind">We report RMSE, bias and Pearson correlation \(r\) against GLORYS12 over all ocean cells and days of 2023, and against Argo over all
+matched measurements. Significance is assessed with a paired bootstrap over Argo <i>profiles</i> (2,000 resamples, all depths of a profile
+resampled together); \(p\) is the share of resamples in which the Sylithe ensemble is not better. Uncertainty calibration is measured by the
+fraction of Argo errors within ±1σ and ±2σ (68 % and 95 % for a calibrated Gaussian). Derived diagnostics follow standard definitions:
+the depths D20 and D26 of the 20 °C and 26 °C isotherms, the mixed-layer depth as the first depth 0.5 °C colder than at 10 m, and the
+tropical cyclone heat potential</p>
+<div class="eq">$$\mathrm{TCHP} = \rho\, c_p \int_{0}^{D_{26}} \big(T(z) - 26^{\circ}\mathrm{C}\big)\,\mathrm{d}z,$$</div>
+<p class="noind">with \(\rho = 1025\) kg m⁻³ and \(c_p = 3985\) J kg⁻¹ K⁻¹, reported in kJ cm⁻².</p>
+
+<h2>4 Results</h2>
+<h3>4.1 Overall skill</h3>
+<p class="noind">Table 3 summarises the 2023 scores. Against GLORYS12, the ensemble reaches 0.662 °C, 41 % below climatology (1.119 °C) and
+slightly below the retrained Attention 3D U-Net++ (0.668 °C); ridge regression reaches 0.740 °C. HYCOM differs strongly from GLORYS12
+(1.193 °C) because it is an independent model with its own biases. Against Argo, the ranking holds: 0.757 °C for the ensemble (0.754 °C for a
+single member) versus 0.762 °C for the published architecture, 0.804 °C for ridge, 0.806 °C for HYCOM and 0.952 °C for climatology. Only
+GLORYS12 (0.684 °C) scores lower, as expected for a product that assimilates the same floats. The release-style comparison in Fig. 4 expresses
+each score as skill over climatology.</p>
+
+<div class="tbl wide">
+<table>
+  <caption><b>Table 3.</b> RMSE (°C) on the 2023 test year. Argo columns use 9,469 measurements from 663 profiles. <span class="star">★</span> Sylithe Ocean Model (this work).</caption>
+  <thead><tr><th>Method</th><th>Type</th><th class="n">vs GLORYS12</th><th class="n">vs Argo</th><th class="n">Argo 0–200 m</th><th class="n">Argo 200–1000 m</th><th class="n">Argo BoB</th><th class="n">Argo AS</th><th class="n">Argo bias</th></tr></thead>
+  <tbody>
+    <tr><td>GLORYS12 reanalysis</td><td>reference</td><td class="n">—</td><td class="n">0.684</td><td class="n">0.761</td><td class="n">0.369</td><td class="n">0.758</td><td class="n">0.680</td><td class="n">+0.158</td></tr>
+    <tr class="ours"><td><span class="star">★</span> Sylithe Ocean Model, 3-model ensemble</td><td>ours</td><td class="n">0.662</td><td class="n">0.757</td><td class="n">0.850</td><td class="n">0.355</td><td class="n">0.833</td><td class="n">0.754</td><td class="n">+0.206</td></tr>
+    <tr class="ours"><td><span class="star">★</span> Sylithe Ocean Model, single model</td><td>ours</td><td class="n">0.680</td><td class="n">0.754</td><td class="n">0.846</td><td class="n">0.357</td><td class="n">0.853</td><td class="n">0.749</td><td class="n">+0.179</td></tr>
+    <tr><td>Attention 3D U-Net++ (Wang et al., 2026), retrained</td><td>published</td><td class="n">0.668</td><td class="n">0.762</td><td class="n">0.856</td><td class="n">0.363</td><td class="n">0.879</td><td class="n">0.757</td><td class="n">+0.218</td></tr>
+    <tr><td>Ridge regression</td><td>baseline</td><td class="n">0.740</td><td class="n">0.804</td><td class="n">0.906</td><td class="n">0.358</td><td class="n">0.894</td><td class="n">0.801</td><td class="n">+0.213</td></tr>
+    <tr><td>HYCOM GOFS 3.1</td><td>reference</td><td class="n">1.193</td><td class="n">0.806</td><td class="n">0.901</td><td class="n">0.406</td><td class="n">0.763</td><td class="n">0.813</td><td class="n">−0.178</td></tr>
+    <tr><td>Climatology (GLORYS12 day-of-year mean)</td><td>baseline</td><td class="n">1.119</td><td class="n">0.952</td><td class="n">1.076</td><td class="n">0.396</td><td class="n">1.005</td><td class="n">0.947</td><td class="n">−0.099</td></tr>
+  </tbody>
+</table>
+</div>
+
+<figure class="wide">
+  <img src="../img/benchmark.jpg" alt="" />
+  <figcaption><b>Figure 4.</b> Benchmark summary: skill over climatology, \(100\,(1 - \mathrm{RMSE}/\mathrm{RMSE}_{\mathrm{clim}})\), per benchmark and method on 2023.
+  Higher is better. The Sylithe ensemble (orange) leads every learned method on all Argo benchmarks; GLORYS12 (hatched) assimilates Argo and is shown as a reference.</figcaption>
+</figure>
+
+<h3>4.2 Skill by depth</h3>
+<p class="noind">Errors are smallest near the surface, where SST constrains the solution, and largest in the thermocline (75–150 m), where small
+vertical displacements of a steep gradient produce large temperature differences (Figs. 5 and 6; Table 4). Against Argo, the ensemble's RMSE
+rises from 0.35 °C at the surface to 1.25 °C at 100–125 m and falls to 0.22 °C at 1000 m. Below 300 m it matches or beats GLORYS12 itself
+(0.491 vs 0.495 °C at 300 m; 0.313 vs 0.327 °C at 500 m; 0.224 vs 0.270 °C at 1000 m), and it beats HYCOM at every depth down to 700 m.</p>
+
+<div class="tbl">
+<table>
+  <caption><b>Table 4.</b> RMSE (°C) against Argo by depth, North Indian Ocean, 2023.</caption>
+  <thead><tr><th class="n">Depth (m)</th><th class="n"><span class="star">★</span> Sylithe</th><th class="n">GLORYS12</th><th class="n">HYCOM</th></tr></thead>
+  <tbody>
+    <tr><td class="n">0</td><td class="n">0.348</td><td class="n">0.274</td><td class="n">0.460</td></tr>
+    <tr><td class="n">10</td><td class="n">0.344</td><td class="n">0.262</td><td class="n">0.489</td></tr>
+    <tr><td class="n">30</td><td class="n">0.809</td><td class="n">0.677</td><td class="n">0.861</td></tr>
+    <tr><td class="n">50</td><td class="n">0.856</td><td class="n">0.701</td><td class="n">0.884</td></tr>
+    <tr><td class="n">75</td><td class="n">1.005</td><td class="n">0.938</td><td class="n">1.098</td></tr>
+    <tr><td class="n">100</td><td class="n">1.248</td><td class="n">1.129</td><td class="n">1.311</td></tr>
+    <tr><td class="n">125</td><td class="n">1.253</td><td class="n">1.170</td><td class="n">1.208</td></tr>
+    <tr><td class="n">150</td><td class="n">1.031</td><td class="n">0.948</td><td class="n">1.036</td></tr>
+    <tr><td class="n">200</td><td class="n">0.722</td><td class="n">0.649</td><td class="n">0.837</td></tr>
+    <tr><td class="n">300</td><td class="n">0.491</td><td class="n">0.495</td><td class="n">0.591</td></tr>
+    <tr><td class="n">500</td><td class="n">0.313</td><td class="n">0.327</td><td class="n">0.351</td></tr>
+    <tr><td class="n">700</td><td class="n">0.292</td><td class="n">0.310</td><td class="n">0.304</td></tr>
+    <tr><td class="n">1000</td><td class="n">0.224</td><td class="n">0.270</td><td class="n">0.225</td></tr>
+  </tbody>
+</table>
+</div>
+
+<figure class="wide">
+  <img src="../../web/public/figures/fig03_skill_depth_glorys.png" alt="" />
+  <figcaption><b>Figure 5.</b> RMSE, bias and correlation by depth against GLORYS12 over every day and ocean cell of 2023, for all methods.
+  The Sylithe models and the published architecture track each other closely and are far better than HYCOM and climatology in the thermocline.</figcaption>
+</figure>
+
+<figure class="wide">
+  <img src="../../web/public/figures/fig04_skill_depth_argo.png" alt="" />
+  <figcaption><b>Figure 6.</b> The same scores against independent Argo profiles. GLORYS12 is best near the surface because it assimilates these
+  floats; below 200 m the Sylithe Ocean Model matches or beats it.</figcaption>
+</figure>
+
+<h3>4.3 Seasonal and spatial structure</h3>
+<p class="noind">Monthly scores (Figs. 7 and 12) show the largest thermocline errors in the transition months, when the thermocline moves fastest,
+and correlation above 0.9 below 300 m throughout the year. Spatially (Figs. 8–10), errors concentrate in the western Arabian Sea upwelling
+zone, along the Somali and Omani coasts and in the eddy-rich western Bay of Bengal. The reconstruction reproduces the large-scale structure and
+the major eddies of GLORYS12 at every depth, while being smoother at the smallest scales (Fig. 8).</p>
+
+<figure class="wide">
+  <img src="../../web/public/figures/paper_fig07_rmse_r_depth_monthly.png" alt="" />
+  <figcaption><b>Figure 7.</b> Monthly RMSE (a) and correlation (b) by depth against GLORYS12, 2023 (layout of Wang et al., 2026, Fig. 7).</figcaption>
+</figure>
+
+<figure class="wide">
+  <img src="../../web/public/figures/paper_fig09_maps_2023-01-01.png" alt="" />
+  <figcaption><b>Figure 8.</b> Sylithe Ocean Model (left), GLORYS12 (middle) and their difference (right) at 50, 200, 500 and 1000 m on 1 January 2023.</figcaption>
+</figure>
+
+<figure class="wide">
+  <img src="../../web/public/figures/paper_fig11_rmse_maps.png" alt="" />
+  <figcaption><b>Figure 9.</b> Maps of RMSE against GLORYS12 over 2023 at standard depths.</figcaption>
+</figure>
+
+<figure class="wide">
+  <img src="../../web/public/figures/paper_fig12_argo_locations_rmse.png" alt="" />
+  <figcaption><b>Figure 10.</b> (a) Locations of the 663 Argo profiles of 2023. (b) RMSE by depth of the Sylithe Ocean Model and GLORYS12 against these profiles.</figcaption>
+</figure>
+
+<figure class="wide">
+  <img src="../../web/public/figures/paper_fig13_binned_rmse_argo.png" alt="" />
+  <figcaption><b>Figure 11.</b> RMSE against Argo in 2° × 2° boxes for the Sylithe Ocean Model, GLORYS12 and their difference (blue: Sylithe lower).</figcaption>
+</figure>
+
+<figure>
+  <img src="../../web/public/figures/paper_fig14_monthly_rmse_argo.png" alt="" />
+  <figcaption><b>Figure 12.</b> Monthly RMSE against Argo.</figcaption>
+</figure>
+
+<figure>
+  <img src="../../web/public/figures/paper_fig16_rmse_profiles_argo.png" alt="" />
+  <figcaption><b>Figure 13.</b> RMSE profiles against Argo for each region.</figcaption>
+</figure>
+
+<figure>
+  <img src="../../web/public/figures/paper_fig17_density_scatter_argo.png" alt="" />
+  <figcaption><b>Figure 14.</b> Predicted versus observed temperature for every matched Argo measurement of 2023 (point density).</figcaption>
+</figure>
+
+<h3>4.4 Statistical significance</h3>
+<p class="noind">Table 5 lists paired bootstrap results. The ensemble is significantly better than ridge regression, climatology and HYCOM over the whole
+column (\(p \le 0.002\)). Against the published Attention 3D U-Net++, the whole-column gain (0.757 vs 0.762 °C) is not significant (\(p = 0.117\)),
+but the gain is significant in the deep ocean (200–1000 m, \(p = 0.003\)), in the Bay of Bengal (\(p = 0.007\) over 0–1000 m and 0–200 m) and in
+the deep Arabian Sea (\(p < 0.001\)). The Bay of Bengal result is notable because this is the most stratified and cyclone-prone basin.</p>
+
+<div class="tbl wide">
+<table>
+  <caption><b>Table 5.</b> Paired bootstrap over Argo profiles (2,000 resamples). Gain = RMSE(other) − RMSE(Sylithe ensemble); \(p\) = probability that Sylithe is not better.</caption>
+  <thead><tr><th>Comparison</th><th>Region · depths</th><th class="n">Profiles</th><th class="n">RMSE Sylithe</th><th class="n">RMSE other</th><th class="n">95 % CI of gain</th><th class="n">p</th></tr></thead>
+  <tbody>
+    <tr><td>Attention 3D U-Net++</td><td>NIO · 0–1000 m</td><td class="n">663</td><td class="n">0.757</td><td class="n">0.762</td><td class="n">−0.003 … +0.015</td><td class="n">0.117</td></tr>
+    <tr><td>Attention 3D U-Net++</td><td>NIO · 200–1000 m</td><td class="n">661</td><td class="n">0.355</td><td class="n">0.363</td><td class="n">+0.003 … +0.014</td><td class="n">0.003</td></tr>
+    <tr><td>Attention 3D U-Net++</td><td>BoB · 0–1000 m</td><td class="n">37</td><td class="n">0.833</td><td class="n">0.879</td><td class="n">+0.012 … +0.078</td><td class="n">0.007</td></tr>
+    <tr><td>Attention 3D U-Net++</td><td>BoB · 0–200 m</td><td class="n">37</td><td class="n">0.957</td><td class="n">1.011</td><td class="n">+0.014 … +0.091</td><td class="n">0.007</td></tr>
+    <tr><td>Attention 3D U-Net++</td><td>AS · 200–1000 m</td><td class="n">609</td><td class="n">0.351</td><td class="n">0.361</td><td class="n">+0.004 … +0.017</td><td class="n">&lt;0.001</td></tr>
+    <tr><td>HYCOM GOFS 3.1</td><td>NIO · 0–1000 m</td><td class="n">663</td><td class="n">0.757</td><td class="n">0.806</td><td class="n">+0.016 … +0.083</td><td class="n">0.002</td></tr>
+    <tr><td>Ridge regression</td><td>NIO · 0–1000 m</td><td class="n">663</td><td class="n">0.757</td><td class="n">0.804</td><td class="n">+0.029 … +0.065</td><td class="n">&lt;0.001</td></tr>
+    <tr><td>Climatology</td><td>NIO · 0–1000 m</td><td class="n">663</td><td class="n">0.757</td><td class="n">0.952</td><td class="n">+0.167 … +0.224</td><td class="n">&lt;0.001</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>4.5 Vertical structure and a cyclone case</h3>
+<p class="noind">A section through the Bay of Bengal during Cyclone Mocha (12 May 2023; Fig. 15) shows that the reconstruction reproduces the depth
+of the thermocline and the isotherm displacements seen in GLORYS12. The TCHP derived from the reconstruction tracks the reanalysis in the
+Arabian Sea and Bay of Bengal (Fig. 16); during Mocha it is about 10 kJ cm⁻² lower than GLORYS12 in the Bay of Bengal and responds a couple
+of days late to the storm's cold wake, a consequence of the 15-day input window.</p>
+
+<figure>
+  <img src="../../web/public/figures/fig09_section_2023-05-12.png" alt="" />
+  <figcaption><b>Figure 15.</b> Vertical temperature section through the Bay of Bengal on 12 May 2023: reconstruction and GLORYS12.</figcaption>
+</figure>
+
+<figure>
+  <img src="../../web/public/figures/fig11_mocha_tchp.png" alt="" />
+  <figcaption><b>Figure 16.</b> Tropical cyclone heat potential from the reconstruction and from GLORYS12 around Cyclone Mocha (May 2023).</figcaption>
+</figure>
+
+<h3>4.6 Uncertainty</h3>
+<p class="noind">The predicted σ is largest in the thermocline and in the Bay of Bengal, matching where errors are largest. Calibration against Argo
+(Fig. 17) shows 57 % of errors within ±1σ, against 68 % for a perfectly calibrated Gaussian: the uncertainty is informative but about 20 %
+too small, partly because the network is trained against GLORYS12, whose own error against Argo is not part of the target. A simple variance
+scaling fitted on the validation year would correct this.</p>
+
+<figure>
+  <img src="../../web/public/figures/fig10_uncertainty_calibration.png" alt="" />
+  <figcaption><b>Figure 17.</b> Uncertainty calibration: fraction of Argo errors within ±1σ and ±2σ by depth, against the 68 % and 95 % expected for a calibrated Gaussian.</figcaption>
+</figure>
+
+<h2>5 Near-real-time operation</h2>
+<p class="noind">The trained ensemble runs operationally on CPU in a scheduled GitHub Actions workflow every six hours. Each run (i) queries the
+Copernicus Marine catalogue for the newest date of each near-real-time product, (ii) ingests only new days onto the 0.25° grid, (iii) predicts
+every day whose SST and SLA are available, (iv) re-predicts any of the last 21 days whose input window gained data (salinity arrives about six
+days late and winds about one day late), incrementing a per-day revision number, (v) scores the last 30 days against newly surfaced Argo floats,
+and (vi) publishes maps, regional statistics, provenance and status to a public branch read by the web console. Because the model was trained
+with variable dropout, a prediction is available as soon as SST and SLA are published. In its first month of operation, the live ensemble scored
+1.046 °C RMSE (bias +0.295 °C) against 346 real-time Argo profiles (4,448 measurements), higher than the 0.757 °C of the reprocessed evaluation
+because near-real-time currents and winds differ from the reprocessed OSCAR and CCMP products used in training. A short fine-tuning on the
+near-real-time archive is the natural remedy.</p>
+
+<h2>6 Application: ocean support for tropical cyclones</h2>
+<p class="noind">From the inputs and the reconstructed column we compute an Ocean Cyclone Potential Index (OCPI) at every cell. Each of seven
+drivers is mapped linearly to [0, 1] between published limits, and the index is their weighted mean, set to zero where SST &lt; 26 °C:</p>
+<div class="eq">$$\mathrm{OCPI} = \frac{\sum_k w_k\, \mathrm{clip}\!\Big(\frac{x_k - a_k}{b_k - a_k}, 0, 1\Big)}{\sum_k w_k}.$$</div>
+
+<div class="tbl">
+<table>
+  <caption><b>Table 6.</b> OCPI drivers, limits \(a_k \to b_k\) and weights \(w_k\).</caption>
+  <thead><tr><th>Driver</th><th>Limits</th><th class="n">w</th></tr></thead>
+  <tbody>
+    <tr><td>Upper-100 m mean T (Price, 2009)</td><td>25 → 29.5 °C</td><td class="n">0.25</td></tr>
+    <tr><td>TCHP (Mainelli et al., 2008)</td><td>0 → 120 kJ cm⁻²</td><td class="n">0.25</td></tr>
+    <tr><td>SST (Gray, 1968)</td><td>26 → 30.5 °C</td><td class="n">0.15</td></tr>
+    <tr><td>D26 (Shay et al., 2000)</td><td>30 → 120 m</td><td class="n">0.10</td></tr>
+    <tr><td>Mixed-layer depth (Lin et al., 2013)</td><td>10 → 60 m</td><td class="n">0.10</td></tr>
+    <tr><td>SLA (Lin et al., 2005)</td><td>−0.1 → 0.2 m</td><td class="n">0.10</td></tr>
+    <tr><td>SSS, barrier layer (Balaguru et al., 2012)</td><td>35 → 31 psu</td><td class="n">0.05</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>Hotspots are the highest-OCPI cells at least 4° apart; a disturbance watch flags cells where the satellite surface wind has cyclonic
+relative vorticity above 2 × 10⁻⁵ s⁻¹ and speed of at least 10 m s⁻¹ over ocean with OCPI ≥ 0.5. The system overlays tropical cyclones
+reported by GDACS (JTWC tracks and forecasts) and, in its live window, captured the Bay of Bengal system ONE-26 of 22–24 September 2026
+(Fig. 18). The index describes ocean support only; it is not a genesis or track forecast, since vertical wind shear and humidity are not in
+the data.</p>
+<p>The structured numbers — regional means, hotspots with their strongest drivers, watch points and seven-day changes — are passed to a large
+language model (DeepSeek) that words a bulletin. The language model computes nothing: every number in its answer must appear in the input,
+otherwise the answer is discarded and a template bulletin is published.</p>
+
+<figure class="wide">
+  <img src="../img/cyclone_timeline.jpg" alt="" />
+  <figcaption><b>Figure 18.</b> Live cyclone panel, 30 August – 7 October 2026. (a) OCPI of each basin's area-mean conditions over the predicted days, with a persistence outlook and today's High hotspots in the upcoming band. (b) Cyclones reported by GDACS: ONE-26 in the Bay of Bengal (solid: observed, hollow: forecast).</figcaption>
+</figure>
+
+<figure>
+  <img src="../img/cyclone_ocpi.jpg" alt="" />
+  <figcaption><b>Figure 19.</b> OCPI on 29 September 2026 with the six strongest hotspots, and its evolution for each basin.</figcaption>
+</figure>
+
+<h2>7 Discussion</h2>
+<p class="noind">Four design choices explain most of the gain over the published architecture on identical data. Predicting anomalies from
+climatology removes the dominant seasonal signal from the learning problem. Self-supervised pretraining gives the encoder a representation of
+the surface ocean learned from all nineteen years, which appears to help most where the surface–subsurface link is weakest: the deep ocean and
+the strongly stratified Bay of Bengal. The β-NLL and vertical-gradient losses keep the thermocline sharp while learning where the model is
+uncertain. Finally, seed averaging and weight EMA reduce variance, which matters most for the small eddies that dominate day-to-day
+thermocline variability.</p>
+<p>Several limitations remain. The lead over the published method is small over the full column. The model learns from GLORYS12 and inherits
+part of its warm bias against Argo (about +0.2 °C). Reconstructions are smoother than the reanalysis at the smallest eddy scales, and σ is
+under-dispersed. The cyclone index weights are set from the literature rather than fitted, and should be calibrated against past best tracks
+(IBTrACS, IMD). Near-real-time accuracy is lower than the reprocessed evaluation until the model is fine-tuned on near-real-time inputs.</p>
+
+<h2>8 Conclusions</h2>
+<p class="noind">The Sylithe Ocean Model reconstructs daily North Indian Ocean temperature from the surface to 1000 m using only satellite
+observations, with a per-point uncertainty. On a withheld year it achieves 0.662 °C RMSE against GLORYS12 and 0.757 °C against independent Argo
+profiles, outperforming a state-of-the-art published architecture retrained on the same data — significantly so in the deep ocean and the Bay
+of Bengal — as well as statistical baselines and an operational ocean model. It runs in near real time at no infrastructure cost and supports
+cyclone-relevant diagnostics and verified language-model bulletins. Future work will fine-tune on near-real-time inputs, add salinity as a
+second output, calibrate the cyclone index against observed tracks and extend the system to marine-heatwave and fisheries applications.</p>
+
+<h2>Code and data availability</h2>
+<p class="noind">Code, notebooks, the operational workflow and the web console are available at github.com/karan27-dev/Sylithe_Ocean_Embedding.
+Live predictions are published on the <i>live-data</i> branch of that repository. Input and target data are freely available from Copernicus
+Marine (GLORYS12, OSTIA, DUACS, multi-observation SSS), NASA PO.DAAC (OSCAR, CCMP), Ifremer ERDDAP (Argo), Google Earth Engine (HYCOM) and GDACS.</p>
+
+<h2>Author contributions</h2>
+<p class="noind">KS conceived the study, designed and implemented the model, the data, training and evaluation pipelines, the near-real-time system and
+the web console, and wrote the manuscript. SP contributed the web data-export module and the console. AS, MS, NS and SY contributed to the
+discussion of the results and to the review of the manuscript.</p>
+
+<h2>Competing interests</h2>
+<p class="noind">The authors declare no competing interests.</p>
+
+<h2>Acknowledgements</h2>
+<p class="noind">We thank the Ministry of Earth Sciences and INCOIS for posing problem statement 26066, and the Copernicus Marine Service, NASA PO.DAAC,
+the Argo Program and GDACS for open data.</p>
+
+<h2>References</h2>
+<div class="refs">
+<p>Balaguru, K., Chang, P., Saravanan, R., et al.: Ocean barrier layers' effect on tropical cyclone intensification, P. Natl. Acad. Sci. USA, 109, 14343–14347, 2012.</p>
+<p>Gray, W. M.: Global view of the origin of tropical disturbances and storms, Mon. Weather Rev., 96, 669–700, 1968.</p>
+<p>He, K., Chen, X., Xie, S., Li, Y., Dollár, P., and Girshick, R.: Masked autoencoders are scalable vision learners, in: Proc. CVPR, 16000–16009, 2022.</p>
+<p>Leipper, D. F. and Volgenau, D.: Hurricane heat potential of the Gulf of Mexico, J. Phys. Oceanogr., 2, 218–224, 1972.</p>
+<p>Lin, I.-I., Wu, C.-C., Emanuel, K. A., Lee, I.-H., Wu, C.-R., and Pun, I.-F.: The interaction of Supertyphoon Maemi (2003) with a warm ocean eddy, Mon. Weather Rev., 133, 2635–2649, 2005.</p>
+<p>Lin, I.-I., Black, P., Price, J. F., et al.: An ocean coupling potential intensity index for tropical cyclones, Geophys. Res. Lett., 40, 1878–1882, 2013.</p>
+<p>Mainelli, M., DeMaria, M., Shay, L. K., and Goni, G.: Application of oceanic heat content estimation to operational forecasting of recent Atlantic category 5 hurricanes, Weather Forecast., 23, 3–16, 2008.</p>
+<p>Price, J. F.: Metrics of hurricane-ocean interaction: vertically-integrated or vertically-averaged ocean temperature?, Ocean Sci., 5, 351–368, 2009.</p>
+<p>Seitzer, M., Tavakoli, A., Antic, D., and Martius, G.: On the pitfalls of heteroscedastic uncertainty estimation with probabilistic neural networks, in: Proc. ICLR, 2022.</p>
+<p>Shay, L. K., Goni, G. J., and Black, P. G.: Effects of a warm oceanic feature on Hurricane Opal, Mon. Weather Rev., 128, 1366–1383, 2000.</p>
+<p>Wang, H., Zhang, L., Yang, S., Yan, X., and Li, Z.: Attention enhanced 3D-U-Net++ ocean temperature and salinity reconstruction in the northwestern Pacific based on transfer learning, Earth Syst. Sci. Data, 18, 4617–4638, 2026.</p>
+<p>Woo, S., Park, J., Lee, J.-Y., and Kweon, I. S.: CBAM: Convolutional Block Attention Module, in: Proc. ECCV, 3–19, 2018.</p>
+<p>Zhou, Z., Rahman Siddiquee, M. M., Tajbakhsh, N., and Liang, J.: UNet++: a nested U-Net architecture for medical image segmentation, in: DLMIA workshop, 3–11, 2018.</p>
+<p>Data: Copernicus Marine Service products GLORYS12V1 (doi:10.48670/moi-00021), OSTIA (moi-00168), multi-observation SSS (moi-00051), DUACS (moi-00145); OSCAR v2.0 and CCMP v3.1 (NASA PO.DAAC); HYCOM GOFS 3.1; Argo (doi:10.17882/42182); GDACS.</p>
+</div>
+
+</div>
+</body>
+</html>
