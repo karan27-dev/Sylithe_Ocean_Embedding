@@ -323,6 +323,63 @@ W.export_model(f'{ROOT}/web_export', rec, G, '/content/inputs.zarr', S, members,
 '''),
 ]
 
-for name, cells in [("01_data_pipeline", NB1), ("02_train", NB2), ("03_validate_export", NB3)]:
+
+NB4 = [
+("markdown", """
+# 04 · Finalise — figures, significance, daily 2023 pipeline and dashboard data, from the trained models
+Free Colab is enough: nothing is trained here. **Runtime → Change runtime type → T4 GPU** is faster (the published
+method's 3D network is slow on CPU); a CPU runtime works too. Reads `MyDrive/OceanEmbed/pack.tar` (data) and
+`MyDrive/OceanEmbed/runpod_results/` (trained models, ensemble reconstruction); writes back into `runpod_results/`.
+Every step logs to Drive and can be re-run on its own.
+"""),
+SETUP,
+("code", r'''
+# ── Data and trained models onto the local disk (~10 min) ────────────────────
+import shutil, glob
+RES, DATA, WORK = f'{ROOT}/runpod_results', '/content/data', '/content/root'
+os.makedirs(DATA, exist_ok=True); os.makedirs(WORK, exist_ok=True)
+if not os.path.exists(f'{DATA}/target.zarr'):
+    print('copying pack.tar'); shutil.copy(f'{ROOT}/pack.tar', '/content/pack.tar')
+    !cd {REPO} && python -m oceanembed.pack unpack --tar /content/pack.tar --dst {DATA}
+    os.remove('/content/pack.tar')
+if not os.path.exists(f'{DATA}/hycom.zarr'):
+    print('copying hycom.zarr'); shutil.copytree(f'{ROOT}/hycom.zarr', f'{DATA}/hycom.zarr')
+shutil.copy(f'{ROOT}/argo_2023.parquet', f'{DATA}/argo_2023.parquet')
+for f in ['stats_v2.npz', 'OceanEmbed_NIO_T_2023.nc']:
+    if not os.path.exists(f'{WORK}/{f}'):
+        print('copying', f); shutil.copy(f'{RES}/{f}', f'{WORK}/{f}')
+for d in ['checkpoints', 'baselines']:
+    shutil.copytree(f'{RES}/{d}', f'{WORK}/{d}', dirs_exist_ok=True)
+ENS = f'{WORK}/OceanEmbed_NIO_T_2023.nc'
+print('seeds:', sorted(glob.glob(f'{WORK}/checkpoints/oceanembed_w15/seed*/glorys_best.pt')))
+'''),
+("code", r'''
+# ── Leaderboard labels: same numbers, the model's name ───────────────────────
+for f in glob.glob(f'{RES}/leaderboard/leaderboard*'):
+    t = open(f, encoding='utf-8').read()
+    open(f, 'w', encoding='utf-8').write(t.replace('OceanEmbed (', 'Sylithe Ocean Model ('))
+print(open(f'{RES}/leaderboard/leaderboard.md', encoding='utf-8').read())
+'''),
+("markdown", "## Daily pipeline: every day of 2023 predicted once and cached, plus the Daily-page files (~10 min)"),
+("code", r'''
+!cd {REPO} && python -m oceanembed.daily run --data {DATA} --root {WORK} --start 2023-01-01 --end 2023-12-31 --from-nc {ENS} 2>&1 | tee {RES}/daily_colab.log
+!cd {REPO} && python -m oceanembed.daily export --data {DATA} --root {WORK} --out {WORK}/web_ops --maps-last 31 2>&1 | tee -a {RES}/daily_colab.log
+for d in ['ops', 'web_ops']:
+    shutil.copytree(f'{WORK}/{d}', f'{RES}/{d}', dirs_exist_ok=True)
+'''),
+("markdown", "## Dashboard export (maps for May 2023, Argo scores, embedding regimes)"),
+("code", r'''
+!cd {REPO} && python -m oceanembed.run web --data {DATA} --root {WORK} --workers 2 2>&1 | tee {RES}/web_colab.log
+shutil.copytree(f'{WORK}/web_export', f'{RES}/web_export', dirs_exist_ok=True)
+'''),
+("markdown", "## Paper evaluation: every metric, the significance test and all 20 figures (longest step)"),
+("code", r'''
+!cd {REPO} && python -m oceanembed.paper_eval --data {DATA} --root {WORK} --out {WORK}/paper --ensemble-nc {ENS} --figures 2>&1 | tee {RES}/paper_colab.log
+shutil.copytree(f'{WORK}/paper', f'{RES}/paper', dirs_exist_ok=True, ignore=shutil.ignore_patterns('_work'))
+print(open(f'{WORK}/paper/significance.csv').read())
+'''),
+]
+
+for name, cells in [("01_data_pipeline", NB1), ("02_train", NB2), ("03_validate_export", NB3), ("04_finalize", NB4)]:
     json.dump(nb(cells), open(os.path.join(HERE, f"{name}.ipynb"), "w"), indent=1)
     print("wrote", name)
