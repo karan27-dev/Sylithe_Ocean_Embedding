@@ -196,6 +196,26 @@ def ingest_new(state: State, today: str, log=print, fetch_fn=fetch, latest_fn=la
     return src_status
 
 
+def backfill_inputs(state: State, today: str, days: int, window: int, log=print, fetch_fn=fetch, chunk: int = 15):
+    """Extend the stored inputs backwards so that `days` more days can be predicted (one-time history build).
+    Fetches in `chunk`-day pieces, oldest last; a piece the near-real-time archive does not hold is skipped."""
+    want_from = str((pd.Timestamp(today) - pd.Timedelta(days=days + window)).date())
+    for did, vars_ in NRT.items():
+        held = state.stored_days(vars_[0][0])
+        end = str((pd.Timestamp(held[0]) - pd.Timedelta(days=1)).date()) if held else str(pd.Timestamp(today).date())
+        t = pd.Timestamp(end)
+        n = 0
+        while str(t.date()) >= want_from:
+            a = max(pd.Timestamp(want_from), t - pd.Timedelta(days=chunk - 1))
+            try:
+                for day, fields in fetch_fn(did, str(a.date()), str(t.date())).items():
+                    state.add_inputs(day, fields); n += 1
+            except Exception as e:
+                log(f"  backfill {LABEL[did]} {a.date()}→{t.date()}: skipped ({repr(e)[:120]})")
+            t = a - pd.Timedelta(days=1)
+        log(f"  backfill {LABEL[did]}: {n} day(s) added back to {want_from}")
+
+
 def _build_store(state: State, path: str, start: str, end: str):
     ingest.init_store(path, C.INPUT_VARS, with_depth=False, start=start, end=end)
     days = _dates(start, end)
@@ -339,7 +359,7 @@ def export_web(state: State, S, log=print):
 
 
 def run(state_dir: str, models_dir: str, stats_path: str | None = None, today: str | None = None,
-        argo: bool = True, log=print, fetch_fn=fetch, latest_fn=latest_available):
+        argo: bool = True, log=print, fetch_fn=fetch, latest_fn=latest_available, backfill: int = 0):
     t0 = time.time()
     today = today or str(pd.Timestamp.utcnow().date())
     state = State(state_dir)
@@ -351,6 +371,8 @@ def run(state_dir: str, models_dir: str, stats_path: str | None = None, today: s
     members, window = [m for m, _ in loaded], loaded[0][1].window
     log(f"live run {today}: {len(members)}-model ensemble, {window}-day window")
     sources = ingest_new(state, today, log, fetch_fn, latest_fn)
+    if backfill > 0:
+        backfill_inputs(state, today, backfill, window, log, fetch_fn)
     done = predict_new(state, members, window, S, today, log)
     skill = argo_check(state, today, log=log) if argo else None
     if skill is not None:
@@ -381,10 +403,11 @@ def main(argv=None):
     r.add_argument("--state", required=True); r.add_argument("--models", required=True)
     r.add_argument("--stats", default=None); r.add_argument("--today", default=None)
     r.add_argument("--no-argo", action="store_true")
+    r.add_argument("--backfill", type=int, default=0, help="also fetch and predict this many past days (one-time history build)")
     s = sub.add_parser("sources", help="print the newest date of every NRT source (no login needed)")
     a = p.parse_args(argv)
     if a.cmd == "run":
-        run(a.state, a.models, a.stats, a.today, not a.no_argo)
+        run(a.state, a.models, a.stats, a.today, not a.no_argo, backfill=a.backfill)
     else:
         for did in NRT:
             print(f"{LABEL[did]:40s} {latest_available(did)}")

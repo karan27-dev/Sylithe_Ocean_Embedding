@@ -10,6 +10,11 @@ on:
   schedule:
     - cron: "15 0,6,12,18 * * *"     # 05:45, 11:45, 17:45, 23:45 IST
   workflow_dispatch:
+    inputs:
+      backfill_days:
+        description: "One-time history build: also fetch and predict this many past days (e.g. 365). Leave 0 for a normal run."
+        required: false
+        default: "0"
 
 permissions:
   contents: write
@@ -21,7 +26,7 @@ concurrency:
 jobs:
   predict:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 300
     steps:
       - uses: actions/checkout@v4
 
@@ -66,7 +71,7 @@ jobs:
           COPERNICUSMARINE_SERVICE_USERNAME: ${{ secrets.CMEMS_USER }}
           COPERNICUSMARINE_SERVICE_PASSWORD: ${{ secrets.CMEMS_PASS }}
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}     # optional: words the cyclone bulletin
-        run: python -m oceanembed.live run --state state --models models
+        run: python -m oceanembed.live run --state state --models models --backfill ${{ github.event.inputs.backfill_days || 0 }}
 
       - name: Publish to the live-data branch
         run: |
