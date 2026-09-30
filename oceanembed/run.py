@@ -43,7 +43,7 @@ class Run:
         self.inputs = os.path.join(self.data, "inputs.zarr")
         self.target = os.path.join(self.data, "target.zarr")
         self.stats_path = os.path.join(self.root, "stats_v2.npz")
-        lr = 3e-4 * math.sqrt(a.batch / 8)                       # square-root LR scaling with batch size
+        lr = C.TrainConfig.lr * math.sqrt(a.batch / 8)           # square-root LR scaling with batch size
         self.cfg = C.TrainConfig(window=a.window, base=a.base, batch_size=a.batch, num_workers=a.workers, lr=lr,
                                  epochs_ssl=a.epochs_ssl, epochs_glorys=a.epochs)
         self.cfg3 = C.TrainConfig(**{**self.cfg.__dict__, "arch": "attn_unetpp3d", "base": 16,
@@ -66,8 +66,9 @@ class Run:
         self.S = D.load_stats(self.stats_path)
 
     def windows(self, period, train, cfg, target=True, **kw):
+        crop = (cfg.crop_h, cfg.crop_w) if train and target and cfg.crop_h else None
         return D.SurfaceWindows(self.inputs, self.target if target else None, self.S, period, cfg.window, train=train,
-                                var_dropout=cfg.var_dropout if train else 0, need_target=target, **kw)
+                                var_dropout=cfg.var_dropout if train else 0, need_target=target, crop=crop, **kw)
 
     def ssl(self):
         self.stats()

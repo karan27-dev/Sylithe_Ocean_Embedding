@@ -136,8 +136,8 @@ class SurfaceWindows(Dataset):
     plus physical helpers (clim, sst at t). All spatial arrays padded to (PAD_H, PAD_W)."""
 
     def __init__(self, inputs_path, target_path, stats, period, window=C.TrainConfig.window,
-                 train=False, var_dropout=0.0, patch_mask=0.0, need_target=True):
-        self.S, self.window, self.train = stats, window, train
+                 train=False, var_dropout=0.0, patch_mask=0.0, need_target=True, crop=None):
+        self.S, self.window, self.train, self.crop = stats, window, train, crop
         self.var_dropout, self.patch_mask = var_dropout, patch_mask
         ds = xr.open_zarr(inputs_path)
         self.time = pd.DatetimeIndex(ds.time.values)
@@ -148,6 +148,7 @@ class SurfaceWindows(Dataset):
         t1 = int(self.time.searchsorted(pd.Timestamp(period[1]), side="right")) - 1
         self.idx = [t for t in range(t0, t1 + 1) if t - window + 1 >= 0]
         self.ocean = stats["ocean"]
+        self.ocean_pad = _pad(stats["ocean"].astype("f4"))
         self.doy = np.minimum(self.time.dayofyear.values, 366)
         self.mean = np.array([stats[f"{v}_mean"] for v in C.INPUT_VARS], "f4")[:, None, None, None]
         self.std = np.array([stats[f"{v}_std"] for v in C.INPUT_VARS], "f4")[:, None, None, None]
@@ -204,7 +205,21 @@ class SurfaceWindows(Dataset):
             m = np.isfinite(y)
             item |= {"y": _pad(np.nan_to_num(y)), "m": _pad(m.astype("f4")),
                      "clim": _pad(np.nan_to_num(clim)), "Ttrue": _pad(np.nan_to_num(Tt))}
+        if self.crop:
+            item = self._random_crop(item)
         return item
+
+    def _random_crop(self, item):
+        """Same random (crop_h × crop_w) window for every spatial array; retried until ≥25 % of it is ocean.
+        Positions are aligned to multiples of 16 so pooling grids line up with full-domain inference."""
+        ch, cw = self.crop
+        for _ in range(10):
+            y0 = 16 * np.random.randint(0, (C.PAD_H - ch) // 16 + 1)
+            x0 = 16 * np.random.randint(0, (C.PAD_W - cw) // 16 + 1)
+            if self.ocean_pad[y0:y0 + ch, x0:x0 + cw].mean() >= 0.25:
+                break
+        return {k: (v[..., y0:y0 + ch, x0:x0 + cw] if isinstance(v, np.ndarray) and v.ndim >= 2
+                    and v.shape[-2:] == (C.PAD_H, C.PAD_W) else v) for k, v in item.items()}
 
 
 def unpad(a):

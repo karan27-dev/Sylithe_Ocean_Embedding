@@ -101,8 +101,12 @@ class TrainConfig:
     epochs_ssl: int = 30
     epochs_argo: int = 40
     epochs_glorys: int = 60
-    lr: float = 3e-4
-    weight_decay: float = 1e-4
+    lr: float = 2e-4
+    weight_decay: float = 0.05  # AdamW; with random crops, the main guard against memorising the training years
+    crop_h: int = 64            # train on random 64×128 crops (0 = whole domain); validation/inference use the full
+    crop_w: int = 128           # domain (the networks are fully convolutional). Whole-domain training overfit
+                                # after ~3 epochs on the first RunPod run (val RMSE rose 11 epochs in a row)
+    patience: int = 8           # early stop after this many epochs without a better validation score
     var_dropout: float = 0.3    # P(drop each droppable input variable) — trains the SST+SSH-only mode
     w_surface: float = 0.1      # T(0 m) ≈ SST consistency
     w_vgrad: float = 0.5        # vertical-gradient (thermocline sharpness) loss

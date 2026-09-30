@@ -203,7 +203,8 @@ S = D.load_stats(STATS)
 cfg = C.TrainConfig()                             # window 15, base 32, β-NLL 0.5, EMA 0.999
 CK = f'{ROOT}/checkpoints/oceanembed_w{cfg.window}'
 windows = lambda period, train, c=cfg: D.SurfaceWindows('/content/inputs.zarr', '/content/target.zarr', S, period,
-                                                        c.window, train=train, var_dropout=c.var_dropout if train else 0)
+                                                        c.window, train=train, var_dropout=c.var_dropout if train else 0,
+                                                        crop=(c.crop_h, c.crop_w) if train and c.crop_h else None)
 print('train days', len(windows(C.TRAIN, False)), '| val days', len(windows(C.VAL, False)))
 '''),
 ("markdown", "## Stage 0 · Self-supervised embedding engine (masked surface autoencoder, no labels)"),

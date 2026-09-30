@@ -115,7 +115,7 @@ def fit(model, train_ds, val_ds, cfg: C.TrainConfig, stage: str, ckpt_dir: str, 
     scaler = torch.amp.GradScaler(enabled=cfg.amp and DEV == "cuda")
     ds_t = torch.tensor(depth_std, device=DEV) if depth_std is not None else None
     last = os.path.join(ckpt_dir, f"{stage}_last.pt")
-    start_ep, best, step, elapsed = 0, float("inf"), 0, 0.0
+    start_ep, best, step, elapsed, stale = 0, float("inf"), 0, 0.0, 0
     if os.path.exists(last):                                  # resume after a disconnect
         s = torch.load(last, map_location=DEV, weights_only=False)
         if s.get("done"):
@@ -123,6 +123,7 @@ def fit(model, train_ds, val_ds, cfg: C.TrainConfig, stage: str, ckpt_dir: str, 
             return s["best"]
         model.load_state_dict(s["raw"]); ema.module.load_state_dict(s["model"]); opt.load_state_dict(s["opt"])
         start_ep, best, step, elapsed = s["epoch"] + 1, s["best"], s.get("step", 0), s.get("elapsed", 0.0)
+        stale = s.get("stale", 0)
         log(f"resumed {stage} at epoch {start_ep}")
     progress = lambda: max(step / total_steps, elapsed / budget_s if budget_s else 0.0)
     tl = DataLoader(train_ds, cfg.batch_size, shuffle=True, num_workers=cfg.num_workers, pin_memory=True,
@@ -145,7 +146,9 @@ def fit(model, train_ds, val_ds, cfg: C.TrainConfig, stage: str, ckpt_dir: str, 
         val = evaluate(ema.module, vl, cfg, stage, ds_t)
         score = val["loss"] if stage == "ssl" else val["rmse_mean"]
         dt = time.time() - t0; elapsed += dt
-        done = ep == epochs - 1 or progress() >= 1.0
+        stale = 0 if score < best else stale + 1
+        early = stale >= cfg.patience and progress() > 0.25
+        done = ep == epochs - 1 or progress() >= 1.0 or early
         unit = "loss" if stage == "ssl" else "RMSE °C"
         log(f"[{stage}] ep {ep:03d}  train loss {tot / max(n, 1):.4f}  val {unit} {score:.4f}  {dt:.0f}s"
             f"  progress {min(progress(), 1):.0%}")
@@ -155,13 +158,15 @@ def fit(model, train_ds, val_ds, cfg: C.TrainConfig, stage: str, ckpt_dir: str, 
         _log_row(os.path.join(ckpt_dir, f"{stage}_log.csv"), row)
         best_now = min(best, score)
         state = dict(model=ema.module.state_dict(), raw=model.state_dict(), opt=opt.state_dict(), epoch=ep,
-                     best=best_now, step=step, elapsed=elapsed, done=done, cfg=cfg.__dict__, val=val)
+                     best=best_now, step=step, elapsed=elapsed, done=done, stale=stale, cfg=cfg.__dict__, val=val)
         if score < best:
             best = score
             torch.save(state, os.path.join(ckpt_dir, f"{stage}_best.pt"))
         torch.save(state, last)
         if done:
-            if ep < epochs - 1:
+            if early:
+                log(f"[{stage}] early stop: no validation improvement for {stale} epochs (best {best:.4f})")
+            elif ep < epochs - 1:
                 log(f"[{stage}] time budget reached after {elapsed / 60:.0f} min: schedule completed, stopping")
             break
     return best
