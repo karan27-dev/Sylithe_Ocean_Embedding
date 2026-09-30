@@ -38,7 +38,7 @@ from . import infer as I
 from . import metrics as M
 from . import train as TR
 
-SHOWCASE_DAYS = ["2023-01-15", "2023-05-12", "2023-08-15"]      # NE monsoon · Cyclone Mocha · SW monsoon
+SHOWCASE_DAYS = ["2023-01-01", "2023-05-12", "2023-08-15", "2023-01-15"]  # paper's Fig. 9 day · Mocha · SW monsoon · NE monsoon
 MOCHA = ("2023-05-01", "2023-05-20")                              # Mocha: genesis ~11 May, landfall 14 May 2023
 K_SIGMA = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0]
 
@@ -49,7 +49,7 @@ class Scorer:
     def __init__(self, sigma: bool = False):
         Z, H, W = len(C.DEPTHS), len(C.LATS), len(C.LONS)
         self.depth = np.zeros((Z, 8))                    # n, Σe, Σe², Σp, Σr, Σp², Σr², Σpr
-        self.month = np.zeros((12, Z, 2))                # n, Σe²
+        self.month = np.zeros((12, Z, 7))                # n, Σe², Σp, Σr, Σp², Σr², Σpr (monthly RMSE and r)
         self.region = {r: np.zeros((Z, 3)) for r in C.REGIONS}      # n, Σe, Σe²
         self.map = np.zeros((3, Z, H, W))                # n, Σe, Σe²
         self.masks = {r: M.region_mask(r) for r in C.REGIONS}
@@ -64,7 +64,8 @@ class Scorer:
             pd_, rd, ed = p[d][o].astype(np.float64), r[d][o].astype(np.float64), e[d][o]
             self.depth[d] += [ed.size, ed.sum(), (ed * ed).sum(), pd_.sum(), rd.sum(), (pd_ * pd_).sum(),
                               (rd * rd).sum(), (pd_ * rd).sum()]
-            self.month[month - 1, d] += [ed.size, (ed * ed).sum()]
+            self.month[month - 1, d] += [ed.size, (ed * ed).sum(), pd_.sum(), rd.sum(), (pd_ * pd_).sum(),
+                                         (rd * rd).sum(), (pd_ * rd).sum()]
             for reg, m in self.masks.items():
                 om = o & m
                 er = e[d][om]
@@ -82,9 +83,11 @@ class Scorer:
             return pd.DataFrame({"depth": C.DEPTHS, "rmse": np.sqrt(se2 / n), "bias": se / n, "r": r, "n": n.astype(int)})
 
     def month_table(self) -> pd.DataFrame:
+        n, se2, sp, sr, spp, srr, spr = np.moveaxis(self.month, -1, 0)
         with np.errstate(invalid="ignore", divide="ignore"):
-            rm = np.sqrt(self.month[..., 1] / self.month[..., 0])
-        return pd.DataFrame([{"month": m + 1, "depth": d, "rmse": rm[m, k]} for m in range(12)
+            rm = np.sqrt(se2 / n)
+            r = (spr / n - sp / n * sr / n) / np.sqrt((spp / n - (sp / n) ** 2) * (srr / n - (sr / n) ** 2))
+        return pd.DataFrame([{"month": m + 1, "depth": d, "rmse": rm[m, k], "r": r[m, k]} for m in range(12)
                              for k, d in enumerate(C.DEPTHS)])
 
     def region_table(self) -> pd.DataFrame:
