@@ -210,14 +210,15 @@ export default function Validation() {
               </thead>
               <tbody>
                 {board.rows.map((r, i) => (
-                  <tr key={r.Method} className={`border-b border-line ${r.Type === 'ours' ? 'bg-[#A3E635]/20 shadow-[inset_3px_0_0_#65A30D]' : ''}`}>
+                  <tr key={r.Method} className={`border-b border-line ${r.Type === 'ours' ? 'bg-[#FDF1E4]' : ''}`}>
                     <td className="num py-2.5 pl-3 pr-3 text-faint">{i + 1}</td>
-                    <td className="py-2.5"><span className={r.Type === 'ours' ? 'font-medium text-ink' : 'text-ink'}>{r.Method}</span>{r.Type === 'ours' ? <span className="ml-2 rounded-full bg-ink px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-[#A3E635]">Ours</span> : <span className="ml-2 text-[11px] text-faint">{r.Type}</span>}</td>
+                    <td className="py-2.5"><span className={r.Type === 'ours' ? 'font-medium text-ink' : 'text-ink'}>{r.Method}</span>{r.Type === 'ours' ? <span className="ml-0.5 text-[#C2702E]" title="Sylithe Ocean Model">*</span> : <span className="ml-2 text-[11px] text-faint">{r.Type}</span>}</td>
                     {LB_COLS.map((c) => <td key={c} className="num py-2.5 pl-4 text-right text-ink2">{r[c] == null ? '—' : Number(r[c]).toFixed(3)}</td>)}
                   </tr>
                 ))}
               </tbody>
             </table>
+            <p className="mt-2 text-[11.5px] text-faint"><span className="text-[#C2702E]">*</span> Sylithe Ocean Model (this work).</p>
           </div>
         ) : (
           <Pending title="Written by the benchmark run">

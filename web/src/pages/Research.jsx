@@ -129,9 +129,9 @@ export default function Research() {
               {board?.rows.map((r) => {
                 const ours = r.Type === 'ours'
                 return (
-                  <tr key={r.Method} className={`border-b border-line ${ours ? 'bg-[#A3E635]/20 shadow-[inset_3px_0_0_#65A30D]' : ''}`}>
+                  <tr key={r.Method} className={`border-b border-line ${ours ? 'bg-[#FDF1E4]' : ''}`}>
                     <td className="py-2.5 pl-3 pr-4"><span className={ours ? 'font-medium text-ink' : 'text-ink2'}>{r.Method}</span>
-                      {ours ? <span className="ml-2 rounded-full bg-ink px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-[#A3E635]">Ours</span> : <span className="ml-2 text-[11px] text-faint">{r.Type}</span>}</td>
+                      {ours ? <span className="ml-0.5 text-[#C2702E]" title="Sylithe Ocean Model">*</span> : <span className="ml-2 text-[11px] text-faint">{r.Type}</span>}</td>
                     {cols.map((c) => {
                       const v = r[c]
                       const isBest = v != null && !r.Method.startsWith('GLORYS') && (c.includes('bias') ? Math.abs(v) : v) === best[c]
@@ -142,6 +142,7 @@ export default function Research() {
               })}
             </tbody>
           </table>
+          <p className="mt-2 text-[11.5px] text-faint"><span className="text-[#C2702E]">*</span> Sylithe Ocean Model (this work).</p>
           <p className="mt-2 text-[11.5px] text-mute">RMSE in °C, lower is better; best satellite-only value per column in teal. GLORYS12 assimilates the Argo floats it is
             scored against and is published weeks to years later; it is shown as the reference, not a competitor.</p>
         </div>

@@ -250,8 +250,8 @@ export default function Model() {
               const ours = r.Type === 'ours'
               const v = (k) => (r[k] == null ? '—' : r[k].toFixed(3))
               return (
-                <tr key={r.Method} className={`border-b border-line ${ours ? 'bg-[#A3E635]/20 shadow-[inset_3px_0_0_#65A30D]' : ''}`}>
-                  <td className={`py-2.5 pl-3 pr-4 ${ours ? 'font-medium text-ink' : 'text-ink2'}`}>{r.Method}{ours && <span className="ml-2 rounded-full bg-ink px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-[#A3E635]">Ours</span>}</td>
+                <tr key={r.Method} className={`border-b border-line ${ours ? 'bg-[#FDF1E4]' : ''}`}>
+                  <td className={`py-2.5 pl-3 pr-4 ${ours ? 'font-medium text-ink' : 'text-ink2'}`}>{r.Method}{ours && <span className="ml-0.5 text-[#C2702E]" title="Sylithe Ocean Model">*</span>}</td>
                   <td className="py-2.5 pr-4 text-mute">{r.Type}</td>
                   <td className="num py-2.5 pr-4">{v('RMSE vs GLORYS (°C)')}</td>
                   <td className={`num py-2.5 pr-4 ${r['RMSE vs Argo (°C)'] === best ? 'font-medium text-sea' : ''}`}>{v('RMSE vs Argo (°C)')}</td>
@@ -261,7 +261,7 @@ export default function Model() {
                 </tr>)
             })}</tbody>
           </table>
-          <p className="mt-2 text-[11.5px] text-faint">RMSE in °C over 2023. GLORYS12 assimilates observations, so its Argo score is the floor any model trained on it can approach.</p>
+          <p className="mt-2 text-[11.5px] text-faint"><span className="text-[#C2702E]">*</span> Sylithe Ocean Model (this work). RMSE in °C over 2023. GLORYS12 assimilates observations, so its Argo score is the floor any model trained on it can approach.</p>
         </div>
         <div className="mt-8 grid gap-px overflow-hidden rounded-[12px] border border-line bg-line md:grid-cols-2 lg:grid-cols-3">
           {[['Sylithe Ocean Model', 'ours', 'Embedding encoder + U-Net++ decoder, SSL-pretrained, β-NLL, 3-seed ensemble. Predicts a mean and σ.'],
