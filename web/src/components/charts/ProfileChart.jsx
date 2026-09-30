@@ -11,7 +11,7 @@ const ZT = [0, 20, 50, 100, 200, 300, 500, 1000]
  *  points   [{ label, values }]                               observations (Argo), drawn as dots
  *  mld      mixed-layer depth, shaded
  */
-export default function ProfileChart({ main, others = [], points = [], mld, height = 360 }) {
+export default function ProfileChart({ main, others = [], points = [], mld, mark, height = 360 }) {
   const [ref, W] = useWidth()
   const [hk, setHk] = useState(null)
   const m = { t: 22, r: 12, b: 26, l: 40 }
@@ -44,6 +44,10 @@ export default function ProfileChart({ main, others = [], points = [], mld, heig
             <rect x={m.l} y={y(0)} width={W - m.l - m.r} height={y(mld) - y(0)} fill="rgb(var(--seatint))" opacity=".55" />
             <text x={m.l + 5} y={y(mld) - 4} className="fill-mute text-[10px]">mixed layer</text>
           </g>
+        )}
+        {Number.isFinite(mark) && mark <= zmax && (
+          <g><line x1={m.l} x2={W - m.r} y1={y(mark)} y2={y(mark)} stroke="#C2702E" strokeDasharray="4 3" />
+            <text x={W - m.r - 2} y={y(mark) - 4} textAnchor="end" className="num fill-[#9A5424] text-[10px]">{mark} m</text></g>
         )}
         {/* axes */}
         {ZT.filter((z) => z <= zmax).map((z) => (

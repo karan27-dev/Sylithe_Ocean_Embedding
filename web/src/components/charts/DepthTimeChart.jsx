@@ -7,7 +7,7 @@ import { useWidth } from './scale'
  *  mode 'abs'   temperature, with the 20 °C (thermocline) and 26 °C isotherms traced
  *  mode 'anom'  difference from the range mean at each depth, red warmer / blue cooler
  */
-export default function DepthTimeChart({ dates, cols, zmax = 500, mode = 'abs', height = 260 }) {
+export default function DepthTimeChart({ dates, cols, zmax = 500, mode = 'abs', height = 260, mark }) {
   const [ref, W] = useWidth(600)
   const cv = useRef(null)
   const [hov, setHov] = useState(null)
@@ -76,6 +76,10 @@ export default function DepthTimeChart({ dates, cols, zmax = 500, mode = 'abs', 
               </g>
             )
           })}
+          {Number.isFinite(mark) && mark <= zmax && (
+            <g><line x1={L} x2={L + pw} y1={y(mark)} y2={y(mark)} stroke="#fff" strokeWidth="1.2" strokeDasharray="4 3" />
+              <text x={L + 4} y={y(mark) - 4} className="num fill-white text-[10px]" style={{ paintOrder: 'stroke', stroke: '#0F172A', strokeWidth: 2 }}>{mark} m</text></g>
+          )}
           {hov && <line x1={xAt(hov.i)} x2={xAt(hov.i)} y1={T} y2={height - B} stroke="#fff" strokeWidth={1} opacity={0.8} />}
         </svg>
         <div className="absolute rounded-[1px]" style={{ right: 26, top: T, width: 8, height: height - T - B, background: rampCss(mode === 'anom' ? 'balance' : 'thermal', '0deg') }} />

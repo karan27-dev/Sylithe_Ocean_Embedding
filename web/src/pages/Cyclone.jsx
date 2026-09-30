@@ -7,6 +7,7 @@ import ProfileChart from '../components/charts/ProfileChart'
 import DepthTimeChart from '../components/charts/DepthTimeChart'
 import Timeline from '../components/Timeline'
 import CycloneTimeline from '../components/charts/CycloneTimeline'
+import DepthScatter from '../components/charts/DepthScatter'
 import { ALERT, catName, useCyclones } from '../lib/gdacs'
 import { SectionHead } from '../components/ui'
 import { level, useDay, useJSON, useManifest } from '../lib/data'
@@ -180,6 +181,7 @@ export default function Cyclone() {
   const bView = view ?? (llm ? 'llm' : 'text')
   const llmState = llm ? 'Sylithe agent (DeepSeek) · numbers verified' : live_?.state === 'writing' ? 'Sylithe agent is writing…' : null
   const z = DEPTHS[depthK]
+  const tempZ = level(m, day.temp, depthK)
   const rr = (grid, sym) => grid && robustRange(grid, sym)
   const regionRec = recs[region]
   const hsMarks = hs.map((h, j) => ({ lat: h.lat, lon: h.lon, label: j + 1 }))
@@ -203,6 +205,8 @@ export default function Cyclone() {
   const OUTPUTS = [
     { id: 'out-temp', title: `Temperature at ${z} m`, grid: level(m, day.temp, depthK), ramp: 'thermal', unit: '°C', dp: 2, s: (x) => x.T?.[depthK],
       cap: `The model's reconstruction at ${z} m (change the depth in the bar above). Around 75–150 m the thermocline sits and the prediction is least certain.` },
+    ...(day.sigma ? [{ id: 'out-sigma', title: `Uncertainty (±1σ) at ${z} m`, grid: level(m, day.sigma, depthK), ramp: 'tempo', unit: '°C', dp: 2, s: (x) => x.sigma?.[depthK],
+      cap: `How sure the model is at ${z} m: the ensemble's predicted standard deviation. Largest in the thermocline and in eddy-rich areas.` }] : []),
     { id: 'out-tchp', title: 'Tropical cyclone heat potential', grid: d.tchp, ramp: 'matter', range: [0, 150], unit: 'kJ cm⁻²', dp: 0, s: (x) => x.tchp, threshold: 50,
       cap: 'Heat stored above the 26 °C isotherm. The bar on the scale and the dashed line mark 50 kJ cm⁻², above which rapid intensification becomes possible.' },
     { id: 'out-t100', title: 'Mean temperature of the upper 100 m', grid: f.t100, ramp: 'thermal', unit: '°C', dp: 2, s: (x) => (x.T ? t100(x.T) : NaN),
@@ -307,7 +311,7 @@ export default function Cyclone() {
           <label className="flex items-center gap-2 text-[12px]"><span className="label">Profile region</span>
             <select value={region} onChange={(e) => setRegion(e.target.value)} className="h-8 rounded-[7px] border border-line bg-paper px-2 text-[12.5px]">
               {RS.map((r) => <option key={r} value={r}>{REGIONS[r].label}</option>)}</select></label>
-          <label className="flex items-center gap-2 text-[12px]"><span className="label">Depth</span>
+          <label className="flex items-center gap-2 text-[12px]"><span className="label">Depth · temperature panels</span>
             <select value={depthK} onChange={(e) => setDepthK(+e.target.value)} className="h-8 rounded-[7px] border border-line bg-paper px-2 text-[12.5px]">
               {DEPTHS.map((dd, k) => <option key={dd} value={k}>{dd} m</option>)}</select></label>
         </div>
@@ -316,15 +320,19 @@ export default function Cyclone() {
       <div className="page">
         {/* ================================================ inputs */}
         <SectionHead id="inputs" className="scroll-mt-28 pt-12" label="01 · Satellite input" title="What the satellites saw">
-          Every figure has the same two panels: (a) the field on {fmtDate(date)} and (b) its area mean over every predicted day for the Bay of Bengal,
-          the Arabian Sea and the whole North Indian Ocean. Hover either panel to read values.
+          Every figure has the same panels: (a) the field on {fmtDate(date)}, (b) its area mean over every predicted day for the Bay of Bengal,
+          the Arabian Sea and the whole North Indian Ocean, and (c) the input against the predicted temperature at {z} m, cell by cell — change the depth
+          above to see how much each surface signal tells about that level.
         </SectionHead>
         <div className="mt-6 space-y-6">
           {INPUTS.map((x) => { n++; return (
             <Fig key={x.id} id={x.id} n={n} title={`${x.title} (${x.src})`} caption={x.cap}>
               <div>{x.grid ? <FigMap g={m.grid} grid={x.grid} ramp={x.ramp} range={rr(x.grid, x.sym)} unit={x.unit} dp={x.dp} tag="a" title={`${x.title}, ${fmtDate(x.on ?? date)}`} /> : pending(x.k)}
                 {x.on && x.on !== date && <p className="mt-1 text-center text-[11px] text-heat">Newest published: {fmtDate(x.on)}. The {fmtDate(date)} prediction ran without it; it is re-run when it arrives.</p>}</div>
-              <Panel tag="b" title="Area mean" dates={dates} values={vals(x.s)} unit={x.unit} dp={x.dp} marker={date} />
+              <div>
+                <Panel tag="b" title="Area mean" dates={dates} values={vals(x.s)} unit={x.unit} dp={x.dp} marker={date} />
+                <DepthScatter g={m.grid} x={x.grid} y={tempZ} unit={x.unit} dp={x.dp} depth={z} />
+              </div>
             </Fig>) })}
         </div>
 
@@ -343,10 +351,10 @@ export default function Cyclone() {
             <Fig id="out-column" n={n} title={`The water column under the ${REGIONS[region].label}`} cols="lg:grid-cols-[1fr_1.5fr]"
               caption="(a) Area-mean predicted profile with its ±1σ uncertainty, against the same area 7 days earlier. (b) The column over every predicted day, with the 26 °C (dashed) and 20 °C (solid) isotherms: a deepening dashed line means the warm layer is thickening.">
               <figure><figcaption className="mb-1 text-center font-display text-[14px] text-ink"><span className="mr-1 text-mute">(a)</span>Profile, {fmtDate(date)}</figcaption>
-                {regionRec?.T ? <ProfileChart height={330} main={{ label: fmtDate(date), values: regionRec.T, sigma: regionRec.sigma }} mld={regionRec.mld}
+                {regionRec?.T ? <ProfileChart height={330} mark={z} main={{ label: fmtDate(date), values: regionRec.T, sigma: regionRec.sigma }} mld={regionRec.mld}
                   others={prev[region]?.T ? [{ label: '7 days before', values: prev[region].T, style: 'dashed' }] : []} /> : <p className="text-[12px] text-faint">No profile.</p>}</figure>
               <figure><figcaption className="mb-1 text-center font-display text-[14px] text-ink"><span className="mr-1 text-mute">(b)</span>Depth over time, 0–300 m</figcaption>
-                <DepthTimeChart dates={dates} cols={dates.map((dd) => rec(dd, region)?.T)} zmax={300} height={300} /></figure>
+                <DepthTimeChart dates={dates} cols={dates.map((dd) => rec(dd, region)?.T)} zmax={z <= 300 ? 300 : z <= 500 ? 500 : 1000} height={300} mark={z} /></figure>
             </Fig>) })()}
         </div>
 
