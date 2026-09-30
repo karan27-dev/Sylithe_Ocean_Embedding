@@ -24,7 +24,7 @@ body {
   @apply bg-paper text-ink font-sans antialiased;
   font-size: 14px;
   line-height: 1.55;
-  font-feature-settings: 'ss01', 'cv11';
+  
 }
 ::selection { background: rgb(var(--sea) / 0.16); }
 :focus-visible { outline: 2px solid rgb(var(--sea)); outline-offset: 2px; border-radius: 3px; }
@@ -34,7 +34,7 @@ button { -webkit-tap-highlight-color: transparent; }
   /* Instrument label: small, mono, spaced. Used for axis titles, field names, section markers. */
   .label { @apply font-mono text-2xs uppercase text-faint; letter-spacing: 0.08em; }
   .num { @apply font-mono; font-variant-numeric: tabular-nums; }
-  .display { @apply font-display text-ink; font-weight: 400; letter-spacing: -0.012em; }
+  .display { @apply font-display text-ink; font-weight: 500; letter-spacing: -0.02em; }
   .hair { @apply border-line; }
   .link { @apply text-sea underline decoration-sea/30 underline-offset-[3px] hover:decoration-sea transition-colors; }
 
@@ -72,7 +72,7 @@ input[type='range'].slider::-moz-range-thumb { width: 11px; height: 11px; border
 input[type='range'].slider:active::-webkit-slider-thumb { transform: scale(1.2); }
 
 /* ---------------------------------------------------------------- leaflet */
-.leaflet-container { background: #E9E7E1; font-family: Geist, system-ui, sans-serif; }
+.leaflet-container { background: #E9E7E1; font-family: 'Space Grotesk', system-ui, sans-serif; }
 .leaflet-control-attribution { background: rgb(var(--paper) / .8) !important; color: rgb(var(--faint)) !important; font-size: 10px !important; }
 .leaflet-control-attribution a { color: rgb(var(--mute)) !important; }
 .leaflet-control-zoom { border: 1px solid rgb(var(--line)) !important; border-radius: 8px !important; overflow: hidden; }

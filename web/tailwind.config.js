@@ -21,9 +21,9 @@ export default {
         cold: v('cold'),
       },
       fontFamily: {
-        display: ['Newsreader', 'Georgia', 'serif'],
-        sans: ['Geist', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
-        mono: ['"Geist Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+        display: ['"Space Grotesk"', 'system-ui', 'sans-serif'],
+        sans: ['"Space Grotesk"', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
+        mono: ['"DM Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },
       fontSize: {
         '2xs': ['10.5px', { lineHeight: '14px', letterSpacing: '0.06em' }],
