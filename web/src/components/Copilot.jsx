@@ -147,7 +147,7 @@ export default function Copilot() {
         className="rise-in flex h-full w-full max-w-[420px] flex-col border-l border-line bg-paper">
         <header className="flex items-center justify-between border-b border-line px-5 py-4">
           <div>
-            <p className="display flex items-center gap-2 text-[19px] leading-none"><img src="/sylithe-logo.png" alt="" className="h-6 w-6 mix-blend-multiply" />Sylithe agent</p>
+            <p className="display flex items-center gap-2 text-[19px] leading-none"><img src="/sylithe-logo.png" alt="" className="h-6 w-6" />Sylithe agent</p>
             <p className="mt-1.5 text-[11.5px] text-mute">Answers from the model's facts and today's live data. Ocean conditions only; official cyclone advisories come from IMD.</p>
           </div>
           <button onClick={() => view.set({ copilot: false })} className="text-[13px] text-mute hover:text-ink">Close</button>

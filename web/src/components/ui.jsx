@@ -16,7 +16,7 @@ export function Mark({ size = 18, className = '' }) {
 export function Wordmark({ className = '' }) {
   return (
     <Link to="/" className={`flex items-center gap-2 text-ink ${className}`} aria-label="Sylithe Ocean Model home">
-      <img src="/sylithe-logo.png" alt="" className="h-7 w-7 mix-blend-multiply" />
+      <img src="/sylithe-logo.png" alt="" className="h-7 w-7" />
       <span className="font-display text-[19px] leading-none tracking-[-0.01em]">Sylithe Ocean Model</span>
     </Link>
   )

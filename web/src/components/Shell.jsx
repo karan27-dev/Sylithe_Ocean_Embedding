@@ -38,7 +38,7 @@ export default function Shell({ children }) {
           <div className="flex items-center justify-end gap-4">
             <button onClick={() => setView({ copilot: true })}
               className="hidden h-8 items-center gap-2 rounded-full bg-ink pl-2 pr-3.5 text-[12.5px] text-paper transition-colors hover:text-[#A3E635] sm:inline-flex">
-              <img src="/sylithe-logo.png" alt="" className="h-5 w-5 rounded-full bg-white p-[1px]" />Ask Sylithe agent
+              <img src="/sylithe-logo.png" alt="" className="h-5 w-5" />Ask Sylithe agent
               <kbd className="num rounded border border-white/25 px-1.5 text-[10px] text-white/60">/</kbd>
             </button>
             {/* A word, not a hamburger: the logo mark is already three lines. */}
