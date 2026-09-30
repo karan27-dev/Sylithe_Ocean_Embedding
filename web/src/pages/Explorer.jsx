@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import { ArrowDown, Eye, EyeOff } from 'lucide-react'
-import { CursorReadout, MapBtn, Side, field } from '../components/workspace'
+import { CursorReadout, DepthPicker, MapBtn, Side, field } from '../components/workspace'
 import { useData } from '../App'
 import OceanMap from '../components/map/OceanMap'
 import Legend from '../components/map/Legend'
@@ -44,7 +44,7 @@ export default function Explorer() {
   return (
     <div>
       <section className="flex flex-col border-b border-line lg:h-[calc(100dvh-var(--bar))] lg:flex-row">
-        <aside className="flex shrink-0 flex-col border-line bg-paper lg:w-[348px] lg:border-r">
+        <aside className="flex shrink-0 flex-col border-line bg-[#FDFCF9] lg:w-[348px] lg:border-r">
           <div className="border-b border-line px-4 pb-4 pt-4">
             <p className="label">Explorer · {m.source.kind === 'model' ? 'Sylithe Ocean Model' : m.source.label}</p>
             <h1 className="display mt-1 text-[22px] leading-tight text-ink">Any layer, any depth, any day</h1>
@@ -98,16 +98,17 @@ export default function Explorer() {
             </Side>
           </div>
 
-          <div className="border-t border-line bg-wash/70 px-4 py-3">
+          <div className="border-t border-line bg-[#FAF6F0] px-4 py-3">
             <div className="flex items-center justify-between gap-2">
               <p className="truncate text-[12px] text-ink">{layer.label}{layer.perDepth ? ` at ${z} m` : ''} · <span className="num text-mute">{day ? fmtDate(day.date) : ''}</span></p>
               <button onClick={() => setVisible((x) => !x)} title={visible ? 'Hide the layer' : 'Show the layer'} className="text-mute hover:text-ink">
                 {visible ? <Eye size={15} /> : <EyeOff size={15} />}</button>
             </div>
             {range && <Legend className="mt-2" layer={layer} range={range} width="100%" marks={MARKS[layer.id] ?? []} />}
+            {layer.perDepth && <DepthPicker depths={DEPTHS} k={v.depth} onChange={(k) => v.set({ depth: k })} />}
             <CursorReadout bind={hoverRef} layer={layer} depth={z} />
           </div>
-          <button onClick={toAnalysis} className="flex items-center justify-center gap-2 border-t border-line bg-ink px-4 py-3 text-[13px] text-paper hover:text-[#A3E635]">
+          <button onClick={toAnalysis} className="flex items-center justify-center gap-2 border-t border-[#E3C7A8] bg-[#F3E2CF] px-4 py-3 text-[13px] text-[#7C4A1E] hover:bg-[#EDD5BB]">
             Point analysis below <ArrowDown size={14} /></button>
         </aside>
 

@@ -48,10 +48,10 @@ button { -webkit-tap-highlight-color: transparent; }
   /* Quiet segmented control for 2–4 options */
   .seg { @apply inline-flex items-center rounded-[7px] border border-line bg-paper p-0.5; }
   .seg > button { @apply px-2.5 h-7 rounded-[5px] text-[12.5px] text-mute transition-colors duration-150 hover:text-ink; }
-  .seg > button[aria-pressed='true'] { @apply bg-ink text-paper; }
+  .seg > button[aria-pressed='true'] { @apply bg-[#F3E2CF] text-[#7C4A1E]; }
 
   .btn { @apply inline-flex items-center gap-2 h-8 px-3 rounded-[7px] border border-line text-[13px] text-ink2 transition-colors duration-150 hover:border-line2 hover:text-ink; }
-  .btn-solid { @apply inline-flex items-center gap-2 h-9 px-4 rounded-[7px] bg-ink text-paper text-[13px] transition-colors duration-150 hover:bg-sea; }
+  .btn-solid { @apply inline-flex items-center gap-2 h-9 px-4 rounded-[7px] bg-[#F3E2CF] text-[#7C4A1E] text-[13px] transition-colors duration-150 hover:bg-[#EDD5BB]; }
 
   /* Floating map instrument panel: flat, hairline, a whisper of blur for legibility over data. */
   .instrument { @apply bg-paper/[0.93] border border-line rounded-[10px]; backdrop-filter: blur(6px); }

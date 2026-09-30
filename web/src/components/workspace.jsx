@@ -10,7 +10,7 @@ export function Side({ n, title, aside, open: init = true, children }) {
   return (
     <section className="border-b border-line">
       <button onClick={() => setOpen((o) => !o)} className="flex w-full items-center gap-2.5 px-4 py-3 text-left hover:bg-wash">
-        <span className="num flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-ink text-[10.5px] text-[#A3E635]">{n}</span>
+        <span className="num flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#F3E2CF] text-[10.5px] text-[#9A5424]">{n}</span>
         <span className="text-[13px] text-ink">{title}</span>
         <span className="ml-auto truncate text-[11px] text-mute">{aside}</span>
         <ChevronDown size={14} className={`shrink-0 text-faint transition-transform ${open ? '' : '-rotate-90'}`} />
@@ -23,7 +23,7 @@ export function Side({ n, title, aside, open: init = true, children }) {
 export function SideTool({ on, onClick, title, children, className = '' }) {
   return (
     <button onClick={onClick} title={title} aria-pressed={on}
-      className={`flex h-9 items-center justify-center gap-1.5 rounded-[7px] border px-2 text-[12px] transition-colors ${on ? 'border-ink bg-ink text-[#A3E635]' : 'border-line bg-paper text-ink2 hover:border-line2 hover:text-ink'} ${className}`}>
+      className={`flex h-9 items-center justify-center gap-1.5 rounded-[7px] border px-2 text-[12px] transition-colors ${on ? 'border-[#E3C7A8] bg-[#F3E2CF] text-[#7C4A1E]' : 'border-line bg-paper text-ink2 hover:border-line2 hover:text-ink'} ${className}`}>
       {children}
     </button>
   )
@@ -32,7 +32,7 @@ export function SideTool({ on, onClick, title, children, className = '' }) {
 export function MapBtn({ on, onClick, title, children }) {
   return (
     <button onClick={onClick} title={title} aria-pressed={on}
-      className={`flex h-9 items-center gap-1.5 rounded-[8px] border px-2.5 text-[12px] shadow-sm backdrop-blur transition-colors ${on ? 'border-ink bg-ink text-[#A3E635]' : 'border-line bg-paper/95 text-ink2 hover:text-ink'}`}>
+      className={`flex h-9 items-center gap-1.5 rounded-[8px] border px-2.5 text-[12px] shadow-sm backdrop-blur transition-colors ${on ? 'border-[#E3C7A8] bg-[#F3E2CF] text-[#7C4A1E]' : 'border-line bg-paper/95 text-ink2 hover:text-ink'}`}>
       {children}
     </button>
   )
@@ -51,6 +51,25 @@ export function CursorReadout({ bind, layer, depth }) {
         <span className="num text-mute">{fmtLat(h.lat)} {fmtLon(h.lon)}</span>
         <span className="num text-[15px] text-ink">{fmt(h.v, layer.dp)} <span className="text-[11px] text-mute">{layer.unit}</span></span>
       </> : <span className="text-faint">Move the cursor over the ocean to read {layer.label.toLowerCase()}{layer.perDepth ? ` at ${depth} m` : ''}</span>}
+    </div>
+  )
+}
+
+const QUICK = [0, 50, 100, 150, 200, 500, 1000]
+
+/** Depth picker for the legend box: common depths as buttons, every standard depth in the menu. */
+export function DepthPicker({ depths, k, onChange }) {
+  return (
+    <div className="mt-2.5">
+      <div className="flex items-center justify-between">
+        <span className="label">Depth</span>
+        <select value={k} onChange={(e) => onChange(+e.target.value)} className="h-6 rounded-[5px] border border-line bg-paper px-1.5 text-[11.5px] text-ink">
+          {depths.map((d, j) => <option key={d} value={j}>{d} m</option>)}</select>
+      </div>
+      <div className="seg mt-1.5 flex w-full">
+        {QUICK.map((d) => { const j = depths.indexOf(d); return (
+          <button key={d} className="num flex-1 !px-0 text-[11px]" aria-pressed={k === j} onClick={() => onChange(j)}>{d}</button>) })}
+      </div>
     </div>
   )
 }

@@ -7,7 +7,7 @@ import TimeSeries from '../components/charts/TimeSeries'
 import ProfileChart from '../components/charts/ProfileChart'
 import DepthTimeChart from '../components/charts/DepthTimeChart'
 import { SectionHead } from '../components/ui'
-import { CursorReadout, MapBtn, Side, SideTool, field } from '../components/workspace'
+import { CursorReadout, DepthPicker, MapBtn, Side, SideTool, field } from '../components/workspace'
 import { useDay, useDays, useJSON, useManifest } from '../lib/data'
 import { DEPTHS, REGIONS, fmt, fmtDate, fmtLat, fmtLon, layerById, layerGrid, renderGrid, robustRange } from '../lib/ocean'
 import { areaKm2, downloadCsv, maskFor, polygon, presetAoi, readAoiFiles, rectangle, summarise } from '../lib/aoi'
@@ -176,8 +176,8 @@ export default function Daily() {
   const url = useMemo(() => grid && renderGrid(ops.grid, grid, L_.ramp, crange), [grid, crange]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const modeSwitch = (
-    <span className="inline-flex h-8 items-center gap-2 rounded-[8px] bg-ink px-3 text-[12.5px] text-paper">
-      <span className={`inline-block h-[7px] w-[7px] rounded-full ${liveDown ? 'bg-line2' : 'bg-[#A3E635] animate-pulse'}`} />{liveDown ? 'Offline · 2023 data' : 'Live'}
+    <span className="inline-flex h-8 items-center gap-2 rounded-[8px] border border-[#E3C7A8] bg-[#F3E2CF] px-3 text-[12.5px] text-[#7C4A1E]">
+      <span className={`inline-block h-[7px] w-[7px] rounded-full ${liveDown ? 'bg-line2' : 'bg-[#4D9F6A] animate-pulse'}`} />{liveDown ? 'Offline · 2023 data' : 'Live'}
     </span>
   )
   if (!series || !date) {
@@ -222,7 +222,7 @@ export default function Daily() {
     <div className="pb-12">
       {/* ================================================ workspace: sidebar + full map */}
       <section className="flex flex-col border-b border-line lg:h-[calc(100dvh-var(--bar))] lg:flex-row">
-        <aside className="flex shrink-0 flex-col border-line bg-paper lg:w-[348px] lg:border-r">
+        <aside className="flex shrink-0 flex-col border-line bg-[#FDFCF9] lg:w-[348px] lg:border-r">
           <div className="border-b border-line px-4 pb-4 pt-4">
             <p className="label">Sylithe Ocean Model · real-time prediction</p>
             <h1 className="display mt-1 text-[22px] leading-tight text-ink">Ocean temperature, 0–1000 m</h1>
@@ -328,7 +328,7 @@ export default function Daily() {
             )}
           </div>
 
-          <div className="border-t border-line bg-wash/70 px-4 py-3">
+          <div className="border-t border-line bg-[#FAF6F0] px-4 py-3">
             <div className="flex items-center justify-between gap-2">
               <p className="truncate text-[12px] text-ink">{L_.label}{L_z} · <span className="num text-mute">{fmtDate(date)}</span></p>
               <button onClick={() => setVisible((v) => !v)} title={visible ? 'Hide the layer' : 'Show the layer'} className="text-mute hover:text-ink">
@@ -336,9 +336,10 @@ export default function Daily() {
             </div>
             {crange ? <Legend className="mt-2" layer={L_} range={crange} width="100%" marks={layer === 'tchp' ? [{ v: 50, label: '50 kJ cm⁻²' }] : []} />
               : <p className="mt-1 text-[11px] text-mute">{mapped.includes(date) ? 'Loading…' : `No map for this day: maps cover the last ${mapped.length} days.`}</p>}
+            {L_.perDepth && <DepthPicker depths={DEPTHS} k={depthK} onChange={setDepthK} />}
             <CursorReadout bind={hoverRef} layer={L_} depth={z} />
           </div>
-          <button onClick={toAnalysis} className="flex items-center justify-center gap-2 border-t border-line bg-ink px-4 py-3 text-[13px] text-paper hover:text-[#A3E635]">
+          <button onClick={toAnalysis} className="flex items-center justify-center gap-2 border-t border-[#E3C7A8] bg-[#F3E2CF] px-4 py-3 text-[13px] text-[#7C4A1E] hover:bg-[#EDD5BB]">
             Full analysis below <ArrowDown size={14} /></button>
         </aside>
 

@@ -37,9 +37,9 @@ export default function Shell({ children }) {
           </nav>
           <div className="flex items-center justify-end gap-4">
             <button onClick={() => setView({ copilot: true })}
-              className="hidden h-8 items-center gap-2 rounded-full bg-ink pl-2 pr-3.5 text-[12.5px] text-paper transition-colors hover:text-[#A3E635] sm:inline-flex">
+              className="hidden h-8 items-center gap-2 rounded-full border border-[#E3C7A8] bg-[#F3E2CF] pl-2 pr-3.5 text-[12.5px] text-[#7C4A1E] transition-colors hover:bg-[#EDD5BB] sm:inline-flex">
               <img src="/sylithe-logo.png" alt="" className="h-5 w-5" />Ask Sylithe agent
-              <kbd className="num rounded border border-white/25 px-1.5 text-[10px] text-white/60">/</kbd>
+              <kbd className="num rounded border border-[#D9B994] px-1.5 text-[10px] text-[#9A5424]">/</kbd>
             </button>
             {/* A word, not a hamburger: the logo mark is already three lines. */}
             <button onClick={() => setOpen((o) => !o)} className="-mr-1 px-1 py-2 text-[13px] text-ink lg:hidden" aria-expanded={open}>
