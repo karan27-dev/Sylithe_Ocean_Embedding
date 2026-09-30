@@ -141,10 +141,10 @@ def run(data: str, root: str, out: str, window: int = C.TrainConfig.window, log=
     seeds = TR.seed_checkpoints(os.path.join(root, "checkpoints", f"oceanembed_w{window}"))
     if seeds:
         members = [TR.load_model(p)[0] for p in seeds]
-        log(f"OceanEmbed ensemble ({len(members)} members)")
-        methods[f"OceanEmbed ({len(members)}-model ensemble)"] = ("ours", I.reconstruct(members, inputs, S, *C.TEST, window=window))
+        log(f"Sylithe Ocean Model ensemble ({len(members)} members)")
+        methods[f"Sylithe Ocean Model ({len(members)}-model ensemble)"] = ("ours", I.reconstruct(members, inputs, S, *C.TEST, window=window))
         if len(members) > 1:
-            methods["OceanEmbed (single model)"] = ("ours", I.reconstruct(members[0], inputs, S, *C.TEST, window=window))
+            methods["Sylithe Ocean Model (single model)"] = ("ours", I.reconstruct(members[0], inputs, S, *C.TEST, window=window))
     p3 = os.path.join(root, "checkpoints", f"attn_unetpp3d_w{window}", "glorys_best.pt")
     if os.path.exists(p3):
         log("published method")
@@ -252,8 +252,9 @@ def main(argv=None):
     a = p.parse_args(argv)
     run(a.data, a.root, a.out, a.window)
     if a.figures:
-        from . import figures
+        from . import figures, figures_paper
         figures.draw_all(a.out)
+        figures_paper.draw_all(a.out)                 # the same results in Wang et al. (2026)'s figure layouts
 
 
 if __name__ == "__main__":
