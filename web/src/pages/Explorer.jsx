@@ -31,44 +31,50 @@ export default function Explorer() {
   const url = useMemo(() => grid && renderGrid(m.grid, grid, layer.ramp, range), [grid, range]) // eslint-disable-line react-hooks/exhaustive-deps
   const probeCell = m && v.probe ? cellAt(m.grid, v.probe.lat, v.probe.lon) : null
 
-  if (!m) return <div className="h-[calc(100dvh-var(--bar))]" />
+  if (!m) return <div className="h-[70vh]" />
 
   const title = layer.perDepth ? <>{layer.label} <span className="text-mute">at</span> {DEPTHS[v.depth]} m</> : layer.label
   const pick = (c) => v.set({ probe: { lat: c.lat, lon: c.lon } })
 
   return (
-    <div className="relative flex h-[calc(100dvh-var(--bar))] overflow-hidden">
-      {/* depth rail (desktop) */}
-      <aside className={`hidden w-[76px] shrink-0 flex-col items-center border-r border-line bg-paper pt-6 transition-opacity lg:flex ${layer.perDepth ? '' : 'opacity-40'}`}>
-        <p className="label mb-4">Depth</p>
-        <DepthGauge value={v.depth} onChange={(k) => v.set({ depth: k, layer: layer.perDepth ? layer.id : 'temp' })} length={Math.min(420, window.innerHeight - 260)} />
-        {!layer.perDepth && <p className="mt-4 px-1.5 text-center text-[10px] leading-tight text-faint">Pick a depth for temperature</p>}
-      </aside>
-
-      <div className="relative flex min-w-0 flex-1 flex-col">
-        {/* title strip: docked above the map, never on top of the data */}
-        <div className="flex items-center gap-6 border-b border-line bg-paper px-4 py-2.5 sm:px-5">
-          <div className="min-w-0">
-            <p className="label truncate">{REGIONS[v.region].label} · {day ? fmtDate(day.date) : '—'}
-              {m.source.kind !== 'model' && <span title={m.source.detail}> · {m.source.label}, reference field</span>}</p>
-            <h1 key={`${layer.id}${v.depth}`} className="display fade-in mt-0.5 truncate text-[20px] leading-tight sm:text-[22px]">
-              {title}<span className="ml-3 hidden font-sans text-[12.5px] tracking-normal text-mute xl:inline">{layer.help}</span>
-            </h1>
-          </div>
-          <div className="ml-auto hidden shrink-0 items-center gap-4 md:flex" role="group" aria-label="Region">
-            {Object.entries(REGIONS).map(([k, r]) => (
-              <button key={k} onClick={() => v.set({ region: k })} aria-selected={v.region === k} className="tab">{r.label}</button>
-            ))}
+    <div>
+      {/* title strip: region and basemap as proper selection controls */}
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-3 border-b border-line bg-paper px-4 py-3 sm:px-6">
+        <div className="min-w-0">
+          <p className="label truncate">{REGIONS[v.region].label} · {day ? fmtDate(day.date) : '—'}
+            {m.source.kind !== 'model' && <span title={m.source.detail}> · {m.source.label}, reference field</span>}</p>
+          <h1 key={`${layer.id}${v.depth}`} className="display fade-in mt-0.5 truncate text-[20px] leading-tight sm:text-[23px]">
+            {title}<span className="ml-3 hidden font-sans text-[12.5px] tracking-normal text-mute xl:inline">{layer.help}</span>
+          </h1>
+        </div>
+        <div className="ml-auto flex flex-wrap items-center gap-3">
+          <label className="flex items-center gap-2 text-[12px] text-mute">
+            <span className="label">Region</span>
+            <select value={v.region} onChange={(e) => v.set({ region: e.target.value })}
+              className="h-8 rounded-[7px] border border-line bg-paper px-2.5 text-[13px] text-ink hover:border-line2 focus:border-sea focus:outline-none">
+              {Object.entries(REGIONS).map(([k, r]) => <option key={k} value={k}>{r.label}</option>)}
+            </select>
+          </label>
+          <div className="seg" role="group" aria-label="Basemap">
+            <button aria-pressed={v.basemap === 'satellite'} onClick={() => v.set({ basemap: 'satellite' })}>Satellite</button>
+            <button aria-pressed={v.basemap === 'light'} onClick={() => v.set({ basemap: 'light' })}>Map</button>
           </div>
         </div>
+      </div>
 
-        <div className="relative min-h-0 flex-1">
+      <div className="flex">
+        {/* depth rail (desktop) */}
+        <aside className={`hidden w-[76px] shrink-0 flex-col items-center border-r border-line bg-paper pt-6 transition-opacity lg:flex ${layer.perDepth ? '' : 'opacity-40'}`}>
+          <p className="label mb-4">Depth</p>
+          <DepthGauge value={v.depth} onChange={(k) => v.set({ depth: k, layer: layer.perDepth ? layer.id : 'temp' })} length={420} />
+          {!layer.perDepth && <p className="mt-4 px-1.5 text-center text-[10px] leading-tight text-faint">Pick a depth for temperature</p>}
+        </aside>
+
+        <div className="relative h-[68vh] min-h-[460px] min-w-0 flex-1">
           <OceanMap g={m.grid} url={url} grid={grid} probe={probeCell} onPick={pick} onHover={setHover} region={v.region}
-            padding={[16, 16]} />
-
-          <p className="label pointer-events-none absolute bottom-2 left-3 z-[500] hidden text-mute sm:block">Study domain · 5–30°N, 45–105°E · 0.25°</p>
-
-          {/* hover readout follows the cursor */}
+            basemap={v.basemap} padding={[16, 16]} scrollZoom={false} />
+          <p className={`label pointer-events-none absolute bottom-2 left-3 z-[500] hidden sm:block ${v.basemap === 'satellite' ? '!text-paper/80' : 'text-mute'}`}>
+            Study domain · 5–30°N, 45–105°E · 0.25° · click the ocean to analyse a point</p>
           {hover && hover.px && (
             <div className="pointer-events-none absolute z-[600] hidden rounded-[6px] border border-line bg-paper/95 px-2.5 py-1.5 sm:block"
               style={{ left: hover.px.x + 16, top: hover.px.y + 16 }}>
@@ -79,38 +85,38 @@ export default function Explorer() {
             </div>
           )}
         </div>
+      </div>
 
-        {/* bottom dock */}
-        <div className="z-[500] border-t border-line bg-paper">
-          <div className="no-scrollbar flex items-end gap-6 overflow-x-auto px-4 pt-2.5 [mask-image:linear-gradient(90deg,#000_85%,transparent)] sm:px-5 sm:[mask-image:none]">
-            {GROUPS.map((gname) => (
-              <div key={gname} className="shrink-0">
-                <p className="label mb-0.5 hidden sm:block">{gname}</p>
-                <div className="flex gap-4" role="tablist" aria-label={gname}>
-                  {LAYERS.filter((l) => l.group === gname).map((l) => {
-                    const on = available(m, l)
-                    return (
-                      <button key={l.id} role="tab" aria-selected={layer.id === l.id} disabled={!on}
-                        title={on ? l.help : `${l.label}: not in this export. Arrives with the model output (notebook 03).`}
-                        onClick={() => v.set({ layer: l.id })}
-                        className={`tab ${on ? '' : 'cursor-not-allowed !text-line2 max-sm:hidden'}`}>
-                        {l.short ?? l.label}
-                      </button>
-                    )
-                  })}
-                </div>
+      {/* controls dock, directly below the map */}
+      <div className="border-y border-line bg-paper">
+        <div className="no-scrollbar flex items-end gap-6 overflow-x-auto px-4 pt-3 sm:px-6">
+          {GROUPS.map((gname) => (
+            <div key={gname} className="shrink-0">
+              <p className="label mb-0.5">{gname}</p>
+              <div className="flex gap-4" role="tablist" aria-label={gname}>
+                {LAYERS.filter((l) => l.group === gname).map((l) => {
+                  const on = available(m, l)
+                  return (
+                    <button key={l.id} role="tab" aria-selected={layer.id === l.id} disabled={!on}
+                      title={on ? l.help : `${l.label}: not in this export.`}
+                      onClick={() => v.set({ layer: l.id })}
+                      className={`tab ${on ? '' : 'cursor-not-allowed !text-line2 max-sm:hidden'}`}>
+                      {l.short ?? l.label}
+                    </button>
+                  )
+                })}
               </div>
-            ))}
+            </div>
+          ))}
+        </div>
+        <div className="flex flex-col gap-3 border-t border-line px-4 py-3 sm:px-6 md:flex-row md:items-center md:gap-8">
+          <div className="lg:hidden">
+            {layer.perDepth && <DepthGauge vertical={false} value={v.depth} onChange={(k) => v.set({ depth: k })} className="max-w-[420px]" />}
           </div>
-          <div className="flex flex-col gap-3 border-t border-line px-4 py-2.5 sm:px-5 md:flex-row md:items-center md:gap-8">
-            <div className="lg:hidden">
-              {layer.perDepth && <DepthGauge vertical={false} value={v.depth} onChange={(k) => v.set({ depth: k })} className="max-w-[420px]" />}
-            </div>
-            <Timeline days={m.days} value={v.date} onChange={(d) => v.set({ date: d })} className="min-w-0 flex-1 md:max-w-[520px]" />
-            <div className="flex items-center gap-4 md:ml-auto">
-              {day?.note && <p className="hidden text-[12px] text-mute xl:block">{day.note}</p>}
-              {range && <Legend layer={layer} range={range} marks={MARKS[layer.id] ?? []} width={230} />}
-            </div>
+          <Timeline days={m.days} value={v.date} onChange={(d) => v.set({ date: d })} className="min-w-0 flex-1 md:max-w-[560px]" />
+          <div className="flex items-center gap-4 md:ml-auto">
+            {day?.note && <p className="hidden text-[12px] text-mute xl:block">{day.note}</p>}
+            {range && <Legend layer={layer} range={range} marks={MARKS[layer.id] ?? []} width={240} />}
           </div>
         </div>
       </div>

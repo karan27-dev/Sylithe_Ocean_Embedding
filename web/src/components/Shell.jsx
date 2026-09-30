@@ -10,7 +10,7 @@ export default function Shell({ children }) {
   const [open, setOpen] = useState(false)
   const setView = useView((s) => s.set)
   const { error } = useData()
-  const fullBleed = pathname === '/explorer'
+  const fullBleed = false
 
   useEffect(() => { setOpen(false) }, [pathname])
   useEffect(() => {

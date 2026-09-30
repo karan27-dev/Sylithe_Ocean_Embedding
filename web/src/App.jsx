@@ -10,6 +10,7 @@ import Cyclone from './pages/Cyclone'
 import Pipeline from './pages/Pipeline'
 import Model from './pages/Model'
 import Downloads from './pages/Downloads'
+import Daily from './pages/Daily'
 import { useManifest } from './lib/data'
 import { useView } from './lib/store'
 
@@ -18,12 +19,13 @@ const DataCtx = createContext(null)
 export const useData = () => useContext(DataCtx)
 
 export const NAV = [
+  { to: '/daily', label: 'Daily forecast' },
   { to: '/explorer', label: 'Explorer' },
-  { to: '/embedding', label: 'Embedding' },
-  { to: '/validation', label: 'Validation' },
   { to: '/cyclone', label: 'Cyclone watch' },
-  { to: '/pipeline', label: 'Pipeline' },
+  { to: '/validation', label: 'Validation' },
+  { to: '/embedding', label: 'Embedding' },
   { to: '/model', label: 'Model' },
+  { to: '/pipeline', label: 'Pipeline' },
   { to: '/data', label: 'Data' },
 ]
 
@@ -38,7 +40,7 @@ export default function App() {
     if (m && (!date || !(date in m.dayIndex))) set({ date: m.days[m.days.length - 1].date })
   }, [data.m, date, set])
 
-  useEffect(() => { if (pathname !== '/explorer') window.scrollTo(0, 0) }, [pathname])
+  useEffect(() => { window.scrollTo(0, 0) }, [pathname])
 
   return (
     <DataCtx.Provider value={data}>
@@ -46,6 +48,7 @@ export default function App() {
         <div key={pathname} className="fade-in">
           <Routes>
             <Route path="/" element={<Overview />} />
+            <Route path="/daily" element={<Daily />} />
             <Route path="/explorer" element={<Explorer />} />
             <Route path="/embedding" element={<Embedding />} />
             <Route path="/validation" element={<Validation />} />
