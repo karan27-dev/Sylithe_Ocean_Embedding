@@ -10,3 +10,5 @@ checkpoints/
 *.pt
 *.nc
 results/
+.env.local
+*.local

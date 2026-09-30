@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useData } from '../App'
-import { loadDay } from '../lib/data'
+import { loadDay, loadJSON } from '../lib/data'
 import { useView } from '../lib/store'
 import { DEPTHS, LAYERS, cellAt, column, fmt, fmtDate, fmtLat, fmtLon, isothermDepth, mld, tchp } from '../lib/ocean'
 
-// A deterministic command line for the console: phrases become the same actions the controls perform, and
-// answers are computed from the loaded fields. No language model, no network: every number is auditable.
-// ARCHITECTURE.md §7 describes the phase-2 analyst that would expose these same actions as tools.
+// Sylithe agent. Map commands ("temperature at 150 m", "probe 88E 15N") act on the console directly, computed from the
+// loaded fields. Questions go to /api/agent (DeepSeek on the server), grounded in the model facts and the live context
+// sent with them: status, Argo check, leaderboard and today's cyclone numbers.
+const LIVE = import.meta.env.VITE_LIVE_BASE || 'https://raw.githubusercontent.com/karan27-dev/Sylithe_Ocean_Embedding/live-data/web'
+const QUESTION = /\?|^(what|why|how|which|where|when|who|is|are|does|do|can|could|should|explain|compare|tell|summar|describe|give)\b/i
 
 const PAGES = { explorer: '/explorer', map: '/explorer', embedding: '/embedding', latent: '/embedding', validation: '/validation',
   argo: '/validation', skill: '/validation', cyclone: '/cyclone', bulletin: '/cyclone', pipeline: '/pipeline', model: '/model',
@@ -19,7 +21,22 @@ const LAYER_WORDS = {
   cur: ['current'], wind: ['wind'],
 }
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
-const SUGGEST = ['cyclone heat in the Bay of Bengal', 'temperature at 150 m', 'probe 88E 15N', 'D20 in January', 'open validation']
+const SUGGEST = ['Where is cyclone potential highest today?', 'How accurate is the model against Argo?', 'Why is the error largest at 100 m?',
+  'How does the Sylithe Ocean Model beat the published U-Net++?', 'temperature at 150 m', 'probe 88E 15N']
+
+async function liveContext(view, path) {
+  const [status, skill, bulletin, board] = await Promise.all([loadJSON('status.json', LIVE), loadJSON('skill.json', LIVE),
+    loadJSON('bulletin.json', LIVE), loadJSON('leaderboard.json')])
+  return {
+    page: path, view: { date: view.date, layer: view.layer, depth_m: DEPTHS[view.depth], region: view.region },
+    live_status: status && { updated_at: status.updated_at, last_predicted: status.last_predicted, predicted_days: status.predicted_days,
+      sources: Object.values(status.sources ?? {}).map((x) => ({ source: x.label, newest: x.latest_available, delay_days: x.lag_days })) },
+    live_argo_check: skill && { rmse_c: skill.rmse, bias_c: skill.bias, profiles: skill.profiles, from: skill.from, to: skill.to },
+    cyclone_today: bulletin?.payload ?? null,
+    leaderboard_2023: board?.rows?.map((r) => ({ method: r.Method, rmse_vs_argo: r['RMSE vs Argo (°C)'], rmse_vs_glorys: r['RMSE vs GLORYS (°C)'],
+      argo_0_200: r['Argo 0–200 m'], argo_200_1000: r['Argo 200–1000 m'], bay_of_bengal: r['Argo Bay of Bengal'], arabian_sea: r['Argo Arabian Sea'] })),
+  }
+}
 
 export function parse(text, days) {
   const t = text.toLowerCase(), acts = []
@@ -73,9 +90,28 @@ export default function Copilot() {
     window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k)
   }, [view])
 
+  const ask = async (text) => {
+    setLog((l) => [...l, { who: 'you', text }, { who: 'Sylithe agent', text: '…', pending: true }])
+    setQ('')
+    let reply
+    try {
+      const history = log.filter((e) => !e.pending).map((e) => ({ role: e.who === 'you' ? 'user' : 'assistant', content: e.text }))
+      const r = await fetch('/api/agent', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: text, history, context: await liveContext(view, window.location.pathname) }) })
+      const j = await r.json().catch(() => ({}))
+      reply = r.ok ? j.answer : j.error === 'no_key'
+        ? 'The agent is not connected yet: the server needs DEEPSEEK_API_KEY (web/.env.local locally, or the Vercel environment when deployed). Map commands such as "temperature at 150 m" still work.'
+        : `The agent could not answer (${j.message ?? r.status}).`
+    } catch {
+      reply = 'The agent endpoint is not reachable from this build. Map commands such as "temperature at 150 m" still work.'
+    }
+    setLog((l) => [...l.filter((e) => !e.pending), { who: 'Sylithe agent', text: reply }])
+  }
+
   const run = async (text) => {
     if (!text.trim() || !m) return
     const acts = parse(text, m.days.map((d) => d.date))
+    if (!acts.length || QUESTION.test(text.trim())) return ask(text)
     const patch = {}
     let reply = acts.length ? `Done: ${acts.map(describe).join(', ')}.` : 'I did not recognise a command. I understand layers, depths, days, regions, coordinates and page names.'
     for (const a of acts) {
@@ -100,19 +136,19 @@ export default function Copilot() {
     const page = acts.find((a) => a.type === 'page')
     if (page) nav(page.to)
     else if (acts.length) nav('/explorer' + window.location.search)
-    setLog((l) => [...l, { who: 'you', text }, { who: 'console', text: reply }])
+    setLog((l) => [...l, { who: 'you', text }, { who: 'Sylithe agent', text: reply }])
     setQ('')
   }
 
   if (!open) return null
   return (
     <div className="fixed inset-0 z-[1200] flex justify-end bg-ink/10 fade-in" onClick={() => view.set({ copilot: false })}>
-      <aside onClick={(e) => e.stopPropagation()} aria-label="Ask the console"
+      <aside onClick={(e) => e.stopPropagation()} aria-label="Ask the Sylithe agent"
         className="rise-in flex h-full w-full max-w-[420px] flex-col border-l border-line bg-paper">
         <header className="flex items-center justify-between border-b border-line px-5 py-4">
           <div>
-            <p className="display text-[19px] leading-none">Ask the console</p>
-            <p className="mt-1.5 text-[11.5px] text-mute">Deterministic commands. Answers are computed from the loaded fields.</p>
+            <p className="display flex items-center gap-2 text-[19px] leading-none"><img src="/sylithe-logo.png" alt="" className="h-6 w-6 mix-blend-multiply" />Sylithe agent</p>
+            <p className="mt-1.5 text-[11.5px] text-mute">Answers from the model's facts and today's live data. Ocean conditions only; official cyclone advisories come from IMD.</p>
           </div>
           <button onClick={() => view.set({ copilot: false })} className="text-[13px] text-mute hover:text-ink">Close</button>
         </header>
@@ -131,7 +167,7 @@ export default function Copilot() {
             {log.map((e, i) => (
               <div key={i} className="rise-in">
                 <p className="label mb-1">{e.who}</p>
-                <p className={`text-[13.5px] leading-relaxed ${e.who === 'you' ? 'text-ink' : 'num text-[12.5px] text-ink2'}`}>{e.text}</p>
+                <p className={`whitespace-pre-line text-[13.5px] leading-relaxed ${e.who === 'you' ? 'text-ink' : 'text-ink2'} ${e.pending ? 'animate-pulse' : ''}`}>{e.text}</p>
               </div>
             ))}
             <div ref={end} />
@@ -139,9 +175,9 @@ export default function Copilot() {
         </div>
         <form onSubmit={(e) => { e.preventDefault(); run(q) }} className="border-t border-line p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
           <div className="flex items-center gap-2 rounded-[8px] border border-line bg-paper px-3 focus-within:border-line2">
-            <input ref={inp} value={q} onChange={(e) => setQ(e.target.value)} placeholder="e.g. TCHP in the Arabian Sea on 15 May"
+            <input ref={inp} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ask about the model, today’s ocean or cyclone potential"
               className="h-10 flex-1 bg-transparent text-[13.5px] text-ink placeholder:text-faint focus:outline-none" />
-            <button className="text-[12.5px] text-sea disabled:text-faint" disabled={!q.trim()}>Run</button>
+            <button className="text-[12.5px] text-sea disabled:text-faint" disabled={!q.trim()}>Ask</button>
           </div>
         </form>
       </aside>
