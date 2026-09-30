@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 
 const API = 'https://www.gdacs.org/gdacsapi/api'
-const BOX = { w: 40, e: 110, s: -5, n: 35 }
+const BOX = { w: 40, e: 100, s: 0, n: 30 }        // North Indian Ocean: Arabian Sea, Bay of Bengal, Andaman Sea
 const RANK = { TD: 1, TS: 2, HU: 3, TY: 3, C1: 3, C2: 4, C3: 5, C4: 6, C5: 7 }
 export const catRank = (c) => RANK[c] ?? 1
 export const catName = { TD: 'Tropical depression', TS: 'Tropical storm', HU: 'Cyclone (hurricane strength)', TY: 'Cyclone (typhoon strength)' }

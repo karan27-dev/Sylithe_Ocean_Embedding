@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useWidth } from './scale'
-import { fmtDate, fmtLat, fmtLon } from '../../lib/ocean'
+import { fmtLat, fmtLon } from '../../lib/ocean'
 import { ALERT, catName, catRank } from '../../lib/gdacs'
 
 const day = (iso) => Date.parse(iso.slice(0, 10))
@@ -27,17 +27,24 @@ function Axes({ x0, y0, w, h, title, ylabel, children }) {
  *  (b) Tropical cyclones reported by GDACS (JTWC tracks) as lollipops: height = intensity, solid = observed,
  *      hollow = official forecast. States explicitly when none was detected.
  */
-export default function CycloneTimeline({ dates, lines, cyclones, today, hotspots = [], ahead = 7 }) {
+const WINDOWS = [[60, '60 days'], [182, '6 months'], [366, '1 year']]
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+export default function CycloneTimeline({ dates: allDates, lines: allLines, cyclones, today, hotspots = [], ahead = 7 }) {
   const [ref, W] = useWidth(900)
   const [hov, setHov] = useState(null)
-  if (!dates.length) return null
+  const [win, setWin] = useState(60)
+  if (!allDates.length) return null
+  const i0 = Math.max(0, allDates.length - win)
+  const dates = allDates.slice(i0)
+  const lines = allLines.map((l) => ({ ...l, values: l.values.slice(i0) }))
   const pts = cyclones.flatMap((c) => c.track.map((p) => ({ ...p, c })))
   const t0 = day(dates[0])
   const tLast = day(dates[dates.length - 1])
   const tNow = day(today)
   const t1 = Math.max(tLast, tNow) + ahead * 864e5
   const inWin = pts.filter((p) => Date.parse(p.t) >= t0 && Date.parse(p.t) <= t1 + 864e5)
-  const L = 84, R = 18, T = 30, H1 = 220, GAP = 62, H2 = 118, B = 44
+  const L = 84, R = W > 760 ? 196 : 18, T = 30, H1 = 220, GAP = 62, H2 = 118, B = 44
   const H = T + H1 + GAP + H2 + B
   const PW = W - L - R
   const x = (t) => L + ((t - t0) / (t1 - t0)) * PW
@@ -47,8 +54,14 @@ export default function CycloneTimeline({ dates, lines, cyclones, today, hotspot
   const T2 = T + H1 + GAP
   const y2 = (r) => T2 + H2 - (r / 3.6) * H2
   const bandX = x(tLast + 864e5)
+  const spanD = (t1 - t0) / 864e5
   const ticks = []
-  for (let t = t0; t <= t1; t += 864e5) if (new Date(t).getUTCDate() % 7 === 1 || t === t0) ticks.push(t)
+  for (let t = t0; t <= t1; t += 864e5) {
+    const dd = new Date(t).getUTCDate()
+    if (spanD <= 80 ? dd % 7 === 1 : spanD <= 200 ? dd === 1 || dd === 15 : dd === 1) ticks.push(t)
+  }
+  const tickLabel = (t) => { const d = new Date(t); return spanD > 200 ? `${MON[d.getUTCMonth()]} ${String(d.getUTCFullYear()).slice(2)}` : `${d.getUTCDate()} ${MON[d.getUTCMonth()]}` }
+  const yrs = [...new Set([t0, t1].map((t) => new Date(t).getUTCFullYear()))].join('–')
   const path = (vals) => vals.map((v, i) => (Number.isFinite(v) ? `${x(day(dates[i]))},${y1(v)}` : null)).filter(Boolean).map((p, i) => `${i ? 'L' : 'M'}${p}`).join('')
   const lastOf = (vals) => { for (let i = vals.length - 1; i >= 0; i--) if (Number.isFinite(vals[i])) return [i, vals[i]]; return null }
   const yticks = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1].filter((v) => v >= lo)
@@ -57,10 +70,12 @@ export default function CycloneTimeline({ dates, lines, cyclones, today, hotspot
 
   const xAxis = (yb) => ticks.map((t) => (
     <g key={t}><line x1={x(t)} x2={x(t)} y1={yb} y2={yb + 4} stroke="#0F172A" />
-      <text x={x(t)} y={yb + 16} textAnchor="middle" className="num fill-ink text-[10px]">{fmtDate(iso(t)).slice(0, 6)}</text></g>))
+      <text x={x(t)} y={yb + 16} textAnchor="middle" className="num fill-ink text-[10px]">{tickLabel(t)}</text></g>))
 
   return (
     <div ref={ref} className="relative w-full">
+      <div className="mb-1 flex justify-end"><div className="seg">{WINDOWS.map(([d, l]) => (
+        <button key={d} aria-pressed={win === d} disabled={d > 60 && allDates.length < d * 0.6} className="disabled:opacity-35" onClick={() => setWin(d)}>{l}</button>))}</div></div>
       <svg width={W} height={H} className="block" onMouseLeave={() => setHov(null)}>
         {/* ---------------- (a) */}
         <Axes x0={L} y0={T} w={PW} h={H1} title="(a) Ocean Cyclone Potential Index by basin" ylabel="OCPI">
@@ -93,7 +108,8 @@ export default function CycloneTimeline({ dates, lines, cyclones, today, hotspot
               <text x="26" y="3.5" className="fill-ink text-[10.5px]">persistence outlook</text></g>
           </g>
           {/* outlook box */}
-          <g transform={`translate(${bandX + 6} ${T + 8})`}>
+          <g transform={`translate(${R > 100 ? L + PW + 14 : bandX + 6} ${T + 8})`}>
+            {R > 100 && <rect x="-8" y="-14" width={R - 20} height={hotspots.length ? 96 : 40} fill="#FAF0E6" stroke="#EBDCCB" />}
             <text className="label fill-[#B45309] text-[9.5px]">Upcoming {ahead} days</text>
             {hs.length ? (
               <>
@@ -122,12 +138,24 @@ export default function CycloneTimeline({ dates, lines, cyclones, today, hotspot
                 <circle cx={cx} cy={cy} r={hov?.p === p ? 5.5 : 4} fill={p.forecast ? '#fff' : col} stroke={col} strokeWidth="1.6" />
               </g>)
           })}
-          {cyclones.map((c) => {
-            const f = c.track.find((p) => Date.parse(p.t) >= t0 && Date.parse(p.t) <= t1)
-            const lastP = c.track.at(-1)
-            return f && <text key={c.id} x={x(Date.parse(f.t)) - 4} y={y2(catRank(f.cat)) - 9} textAnchor="end" className="fill-ink text-[10.5px]">
-              {c.name} · {fmtLat(lastP.lat)} {fmtLon(lastP.lon)}</text>
-          })}
+          {(() => {
+            // one label per cyclone at its strongest point; labels that would overlap move up a row or are dropped
+            const labs = cyclones.map((c) => {
+              const inw = c.track.filter((p) => Date.parse(p.t) >= t0 && Date.parse(p.t) <= t1)
+              if (!inw.length) return null
+              const top = inw.reduce((b, p) => (catRank(p.cat) > catRank(b.cat) ? p : b), inw[0]), lastP = c.track.at(-1)
+              return { id: c.id, x: x(Date.parse(top.t)), r: catRank(top.cat), text: spanD > 80 ? c.name.replace(/-\d+$/, '') : `${c.name} · ${fmtLat(lastP.lat)} ${fmtLon(lastP.lon)}` }
+            }).filter(Boolean).sort((a, b) => a.x - b.x)
+            const rows = []
+            return labs.map((l) => {
+              const w = l.text.length * 6.2
+              let row = 0
+              while (row < 3 && rows[row] != null && l.x - w / 2 < rows[row] + 8) row++
+              if (row === 3) return null
+              rows[row] = l.x + w / 2
+              return <text key={l.id} x={l.x} y={y2(Math.min(3.3, l.r)) - 9 - row * 12} textAnchor="middle" className="fill-ink text-[10px]">{l.text}</text>
+            })
+          })()}
           {!inWin.length && (
             <g>
               <rect x={L + PW / 2 - 190} y={T2 + H2 / 2 - 14} width="380" height="26" fill="#fff" stroke="#0F172A" strokeOpacity="0.25" rx="2" />
@@ -137,7 +165,7 @@ export default function CycloneTimeline({ dates, lines, cyclones, today, hotspot
           {tNow >= t0 && tNow <= t1 && <line x1={x(tNow)} x2={x(tNow)} y1={T2} y2={T2 + H2} stroke="#0F172A" strokeDasharray="3 3" opacity="0.55" />}
         </Axes>
         {xAxis(T2 + H2)}
-        <text x={L + PW / 2} y={H - 4} textAnchor="middle" className="fill-ink text-[11px]">Date ({new Date(t1).getUTCFullYear()})</text>
+        <text x={L + PW / 2} y={H - 4} textAnchor="middle" className="fill-ink text-[11px]">Date ({yrs})</text>
       </svg>
       {hov && (
         <div className="pointer-events-none absolute z-10 rounded-[6px] border border-line bg-paper/95 px-2.5 py-1.5 text-[11.5px]"
