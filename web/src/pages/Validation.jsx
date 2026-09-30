@@ -3,6 +3,7 @@ import { useData } from '../App'
 import OceanMap from '../components/map/OceanMap'
 import ProfileChart from '../components/charts/ProfileChart'
 import { Coverage, ErrorStrip, SkillByDepth, styleOf } from '../components/charts/SkillCharts'
+import BenchmarkBars from '../components/charts/BenchmarkBars'
 import { Pending, SectionHead } from '../components/ui'
 import { useJSON } from '../lib/data'
 import { DEPTHS, REGIONS, colorAt, fmt, fmtDate, fmtLat, fmtLon, inRegion } from '../lib/ocean'
@@ -201,6 +202,7 @@ export default function Validation() {
         lede="Test year 2023, never seen in training. Same grid, depths and Argo floats for every row: ours, the published method retrained on our data, simple baselines and the reference products.">
         {board?.rows?.length ? (
           <div className="overflow-x-auto">
+            <div className="mb-8 min-w-[720px] rounded-[12px] border border-line bg-white/70 p-5"><BenchmarkBars rows={board.rows} /></div>
             <table className="w-full min-w-[820px] text-[12.5px]">
               <thead>
                 <tr className="border-b border-line text-left">
