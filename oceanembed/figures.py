@@ -192,7 +192,7 @@ class Figs:
                     ax.set_ylabel(f"{z} m", fontsize=9, weight="bold")
             fig.colorbar(im_t, ax=axes[i, :2].tolist(), shrink=0.85, pad=0.01, label="°C")
         fig.colorbar(im_e, ax=axes[:, 2:].ravel().tolist(), shrink=0.5, pad=0.01, label="Error (°C)")
-        fig.suptitle(f"Reconstruction on {day} (held-out year, from surface satellite data only)", fontsize=10)
+        fig.suptitle(f"Sylithe Ocean Model on {day} (held-out year, from surface satellite data only)", fontsize=10)
         self.save(fig, "fig06_maps_" + day)
 
     def rmse_maps(self, depths=(50, 100, 200, 500)):

@@ -141,13 +141,13 @@ class PaperFigs:
             lo, hi = np.nanpercentile(ref[self.ocean], [1, 99])
             err = rec - ref
             e = np.nanpercentile(np.abs(err[self.ocean]), 99) or 0.1
-            for j, (a, title, lims, lab) in enumerate([(rec, f"Reconstruction-{z}m", (lo, hi), "Temperature (°C)"),
-                                                      (ref, f"GLORYS12-{z}m", (lo, hi), "Temperature (°C)"),
-                                                      (err, f"Error-{z}m", (-e, e), "Temperature (°C)")]):
+            for j, (a, title, lims, lab) in enumerate([(rec, f"Sylithe Ocean Model – {z} m", (lo, hi), "Temperature (°C)"),
+                                                      (ref, f"GLORYS12 – {z} m", (lo, hi), "Temperature (°C)"),
+                                                      (err, f"Sylithe Ocean Model − GLORYS12 – {z} m", (-e, e), "Temperature (°C)")]):
                 ax = axes[i, j]
                 self.field(ax, a, *lims, label=lab)
                 ax.set_title(title, fontsize=9)
-        fig.suptitle(f"Reconstructed temperature (left), GLORYS12 (middle) and their differences (right), {day}", fontsize=10, y=1.0)
+        fig.suptitle(f"Sylithe Ocean Model (left), GLORYS12 (middle) and their difference (right), {day}", fontsize=10, y=1.0)
         fig.tight_layout()
         self.save(fig, "paper_fig09_maps_" + day)
 
@@ -177,7 +177,7 @@ class PaperFigs:
         for n in [self.ours, "GLORYS12 reanalysis"]:
             if n and f"{n}_T0" in self.m:
                 r = [np.sqrt(np.nanmean((self.m[f"{n}_T{d}"] - self.m[f"T{d}"]) ** 2)) for d in C.DEPTHS]
-                ax2.plot(r, C.DEPTHS, color=self.color(n), lw=1.5, label="Reconstruction" if n == self.ours else "GLORYS12")
+                ax2.plot(r, C.DEPTHS, color=self.color(n), lw=1.5, label="Sylithe Ocean Model" if n == self.ours else "GLORYS12")
         ax2.set_ylim(1000, 0); ax2.set_ylabel("Depth (m)"); ax2.set_xlabel("RMSE (°C)")
         ax2.set_title("(b) Temperature RMSE"); ax2.legend(loc="lower right")
         fig.tight_layout()
@@ -206,7 +206,7 @@ class PaperFigs:
         dmax = np.nanpercentile(np.abs(A - B), 98) or 0.1
         fig, axes = plt.subplots(1, 3, figsize=(15, 3.3))
         ext = [lon_e[0], lon_e[-1], lat_e[0], lat_e[-1]]
-        for ax, a, title, cm, lim in [(axes[0], A, "(a) Reconstruction Temperature", "Reds", (0, vmax)),
+        for ax, a, title, cm, lim in [(axes[0], A, "(a) Sylithe Ocean Model Temperature", "Reds", (0, vmax)),
                                       (axes[1], B, "(b) GLORYS12 Temperature", "Reds", (0, vmax)),
                                       (axes[2], A - B, "(c) Difference Temperature ((a)-(b))", "bwr", (-dmax, dmax))]:
             ax.set_facecolor("#bdbdbd")
