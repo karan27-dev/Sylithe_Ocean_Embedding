@@ -79,28 +79,42 @@ function Framer({ region, padding }) {
  *  points     [{lat, lon, color, r, id}] e.g. Argo floats
  *  region     'NIO' | 'BoB' | 'AS' — framed with a fly-to
  */
+const IMAGERY = 'https://server.arcgisonline.com/ArcGIS/rest/services'
+
 export default function OceanMap({ g, url, grid, probe, onPick, onHover, points, onPoint, region = 'NIO', showRegion = true,
-  padding = [24, 24], zoomControl = true, scrollZoom = true, className = '', children }) {
+  padding = [24, 24], zoomControl = true, scrollZoom = true, basemap = 'light', className = '', children }) {
+  const sat = basemap === 'satellite'
+
   const bounds = gridBounds(g)
   const [ready, setReady] = useState(false)
   return (
     <MapContainer bounds={DOMAIN} minZoom={3} maxZoom={9} zoomSnap={0.25} zoomDelta={0.5} wheelPxPerZoomLevel={120}
       maxBounds={[[-5, 30], [40, 120]]} zoomControl={false} attributionControl scrollWheelZoom={scrollZoom}
       whenReady={() => setReady(true)} className={`h-full w-full ${className}`}>
-      <TileLayer url={`${ESRI}/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}`} maxNativeZoom={16}
-        attribution="Basemap © Esri" />
+      {sat ? (
+        <TileLayer key="sat" url={`${IMAGERY}/World_Imagery/MapServer/tile/{z}/{y}/{x}`} maxNativeZoom={17}
+          attribution="Imagery © Esri, Maxar, Earthstar Geographics" />
+      ) : (
+        <TileLayer key="light" url={`${ESRI}/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}`} maxNativeZoom={16}
+          attribution="Basemap © Esri" />
+      )}
       <FadeOverlay url={url} bounds={bounds} />
       {/* place names sit above the data, below markers */}
       <Pane name="labels" style={{ zIndex: 450, pointerEvents: 'none' }}>
-        <TileLayer url={`${ESRI}/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}`} maxNativeZoom={16} opacity={0.65} />
+        {sat ? (
+          <TileLayer key="satl" url={`${IMAGERY}/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}`} maxNativeZoom={16} opacity={0.8} />
+        ) : (
+          <TileLayer key="lightl" url={`${ESRI}/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}`} maxNativeZoom={16} opacity={0.65} />
+        )}
       </Pane>
       <Pane name="domain" style={{ zIndex: 440, pointerEvents: 'none' }}>
-        <Polygon positions={[WORLD, HOLE]} interactive={false} pathOptions={{ stroke: false, fillColor: '#F5F3EE', fillOpacity: 0.62 }} />
-        <Rectangle bounds={DOMAIN} interactive={false} pathOptions={{ color: '#15181A', weight: 0.8, opacity: 0.45, fill: false }} />
+        <Polygon positions={[WORLD, HOLE]} interactive={false}
+          pathOptions={{ stroke: false, fillColor: sat ? '#0B1418' : '#F5F3EE', fillOpacity: sat ? 0.45 : 0.62 }} />
+        <Rectangle bounds={DOMAIN} interactive={false} pathOptions={{ color: sat ? '#F5F3EE' : '#15181A', weight: 0.8, opacity: 0.6, fill: false }} />
       </Pane>
       {showRegion && region !== 'NIO' && (
         <Rectangle bounds={REGIONS[region].bounds} interactive={false}
-          pathOptions={{ color: '#15181A', weight: 1, opacity: 0.55, dashArray: '2 4', fill: false }} />
+          pathOptions={{ color: sat ? '#F5F3EE' : '#15181A', weight: 1.2, opacity: 0.8, dashArray: '3 5', fill: false }} />
       )}
       {points?.map((p) => (
         <CircleMarker key={p.id} center={[p.lat, p.lon]} radius={p.r ?? 4}

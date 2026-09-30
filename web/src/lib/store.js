@@ -16,6 +16,7 @@ export const useView = create((set) => ({
   depth: depth >= 0 ? depth : DEPTHS.indexOf(100),
   probe,
   region: q.get('region') || 'NIO',
+  basemap: q.get('basemap') || 'satellite',
   compare: q.get('compare') === '1',
   copilot: q.get('copilot') === '1',
   set: (patch) => set(patch),
@@ -28,6 +29,7 @@ useView.subscribe((s) => {
   p.set('depth', DEPTHS[s.depth])
   if (s.probe) p.set('probe', `${s.probe.lon.toFixed(2)},${s.probe.lat.toFixed(2)}`)
   if (s.region !== 'NIO') p.set('region', s.region)
+  if (s.basemap !== 'satellite') p.set('basemap', s.basemap)
   if (s.compare) p.set('compare', '1')
   const url = `${window.location.pathname}?${p}`
   if (url !== window.location.pathname + window.location.search) window.history.replaceState(window.history.state, '', url)

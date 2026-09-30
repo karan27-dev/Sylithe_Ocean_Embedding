@@ -9,31 +9,32 @@ const once = (key, fn) => {
   return cache.get(key)
 }
 
-export const loadManifest = () =>
-  once('manifest', async () => {
-    const r = await fetch(`${BASE}/manifest.json`)
+export const loadManifest = (base = BASE) =>
+  once(`manifest:${base}`, async () => {
+    const r = await fetch(`${base}/manifest.json`)
     if (!r.ok) throw new Error(`manifest.json: HTTP ${r.status}`)
     const m = await r.json()
     m.N = m.grid.width * m.grid.height
     m.dayIndex = Object.fromEntries(m.days.map((d, i) => [d.date, i]))
     m.has = (name) => name in m.layers
+    m.base = base
     return m
   })
 
 /** Optional side files (argo.json, skill_depth.json, …): resolve to null when absent. */
-export const loadJSON = (name) =>
-  once(`json:${name}`, async () => {
-    const r = await fetch(`${BASE}/${name}`)
+export const loadJSON = (name, base = BASE) =>
+  once(`json:${base}/${name}`, async () => {
+    const r = await fetch(`${base}/${name}`)
     if (!r.ok) return null
     const t = await r.text()
     try { return JSON.parse(t) } catch { return null }     // dev server answers index.html for missing files
   })
 
 export const loadLayer = (m, date, name) =>
-  once(`${date}/${name}`, async () => {
+  once(`${m.base}/${date}/${name}`, async () => {
     const spec = m.layers[name]
     if (!spec) throw new Error(`layer ${name} is not in this export`)
-    const r = await fetch(`${BASE}/days/${date}/${name}.bin`)
+    const r = await fetch(`${m.base}/days/${date}/${name}.bin`)
     if (!r.ok) throw new Error(`${date}/${name}: HTTP ${r.status}`)
     const q = new Int16Array(await r.arrayBuffer())
     const out = new Float32Array(q.length), s = spec.scale, o = spec.offset, nd = m.nodata
@@ -43,7 +44,7 @@ export const loadLayer = (m, date, name) =>
 
 /** Everything the console needs for one day. Missing optional layers are simply absent. */
 export const loadDay = (m, date) =>
-  once(`day:${date}`, async () => {
+  once(`${m.base}:day:${date}`, async () => {
     const meta = m.days[m.dayIndex[date]]
     const names = meta?.layers ?? []
     const entries = await Promise.all(names.map(async (n) => [n, await loadLayer(m, date, n)]))
@@ -54,9 +55,9 @@ export const loadDay = (m, date) =>
 export const level = (m, arr, k) => arr.subarray(k * m.N, (k + 1) * m.N)
 
 // ---------------------------------------------------------------- hooks
-export function useManifest() {
+export function useManifest(base = BASE) {
   const [s, set] = useState({ m: null, error: null })
-  useEffect(() => { loadManifest().then((m) => set({ m, error: null }), (e) => set({ m: null, error: e.message })) }, [])
+  useEffect(() => { loadManifest(base).then((m) => set({ m, error: null }), (e) => set({ m: null, error: e.message })) }, [base])
   return s
 }
 
@@ -71,9 +72,9 @@ export function useDay(m, date) {
   return day && day.date === date ? day : null
 }
 
-export function useJSON(name) {
+export function useJSON(name, base = BASE) {
   const [v, set] = useState(undefined)            // undefined = loading, null = absent
-  useEffect(() => { let live = true; loadJSON(name).then((x) => live && set(x)); return () => { live = false } }, [name])
+  useEffect(() => { let live = true; loadJSON(name, base).then((x) => live && set(x)); return () => { live = false } }, [name, base])
   return v
 }
 
