@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, Check, Copy } from 'lucide-react'
+import { AlertTriangle, ArrowRight, Check, Copy, ShieldCheck } from 'lucide-react'
 import FigMap from '../components/charts/FigMap'
 import TimeSeries from '../components/charts/TimeSeries'
 import ProfileChart from '../components/charts/ProfileChart'
 import DepthTimeChart from '../components/charts/DepthTimeChart'
 import Timeline from '../components/Timeline'
+import CycloneTimeline from '../components/charts/CycloneTimeline'
+import { ALERT, catName, useCyclones } from '../lib/gdacs'
 import { SectionHead } from '../components/ui'
 import { level, useDay, useJSON, useManifest } from '../lib/data'
 import { DEPTHS, REGIONS, derived, fmt, fmtDate, fmtLat, fmtLon, layerGrid, robustRange } from '../lib/ocean'
@@ -126,6 +128,8 @@ export default function Cyclone() {
   const windDay = useDay(m, windDate !== date ? windDate : null)
 
   const dates = useMemo(() => (series ? Object.keys(series.days).sort() : []), [series])
+  const today = new Date().toISOString().slice(0, 10)
+  const cyc = useCyclones(dates[0] ?? null, addDays(today, 7))
   const rec = (d, r) => series?.days[d]?.[r]
   const vals = (fn) => (r) => dates.map((d) => { const x = rec(d, r); return x ? fn(x) ?? NaN : NaN })
 
@@ -155,6 +159,8 @@ export default function Cyclone() {
   const regionRec = recs[region]
   const hsMarks = hs.map((h, j) => ({ lat: h.lat, lon: h.lon, label: j + 1 }))
   const watchMarks = watch.map((w) => ({ lat: w.lat, lon: w.lon, kind: 'cross' }))
+  const trackMarks = cyc.list.flatMap((c) => c.track.filter((p) => Math.abs(Date.parse(p.t) - Date.parse(date)) <= 2 * 864e5)
+    .map((p, j) => ({ lat: p.lat, lon: p.lon, kind: 'dot', label: j === 0 ? c.name : undefined })))
   const pending = (k) => (day[k] ? null : <p className="rounded-[8px] bg-wash px-3 py-8 text-center text-[12.5px] text-mute">Not yet published for {fmtDate(date)} (late input); the model ran without it.</p>)
 
   const INPUTS = [
@@ -193,13 +199,48 @@ export default function Cyclone() {
           the only thing a language model receives to word the bulletin.
         </SectionHead>
 
+        {/* alert + timeline */}
+        {(() => {
+          const now = Date.now()
+          const active = cyc.list.filter((c) => c.current || c.track.some((p) => Date.parse(p.t) >= now - 864e5))
+          const last = (c) => c.track.filter((p) => !p.forecast).at(-1) ?? c.track.at(-1)
+          const end = (c) => c.track.at(-1)
+          return (
+            <div className="mt-8">
+              {active.length ? active.map((c) => (
+                <div key={c.id} className="mb-3 flex flex-wrap items-start gap-4 rounded-[12px] border px-5 py-4"
+                  style={{ borderColor: ALERT[c.alert], background: `${ALERT[c.alert]}14` }}>
+                  <AlertTriangle size={22} style={{ color: ALERT[c.alert] }} className="mt-0.5 shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[15px] font-medium text-ink">Cyclone alert · {c.name} · GDACS {c.alert}</p>
+                    <p className="mt-1 text-[13px] text-ink2">{catName[last(c)?.cat] ?? 'Tropical system'} at {fmtLat(last(c).lat)} {fmtLon(last(c).lon)} ({last(c).t.slice(0, 16).replace('T', ' ')} UTC)
+                      {end(c)?.forecast && <>, forecast to reach {fmtLat(end(c).lat)} {fmtLon(end(c).lon)} by {end(c).t.slice(0, 16).replace('T', ' ')} UTC</>}. {c.severity}.</p>
+                    <p className="mt-1 text-[11.5px] text-mute">Track and forecast: JTWC via GDACS. Official Indian warnings: IMD (mausam.imd.gov.in). {c.report && <a className="link" href={c.report} target="_blank" rel="noreferrer">GDACS report</a>}</p>
+                  </div>
+                </div>
+              )) : (
+                <div className="mb-3 flex items-center gap-3 rounded-[12px] border border-line bg-white/70 px-5 py-3.5">
+                  <ShieldCheck size={20} className="shrink-0 text-[#4D9F6A]" />
+                  <p className="text-[13px] text-ink2">{cyc.loading ? 'Checking GDACS for active cyclones…' : cyc.error ? 'GDACS could not be reached; no cyclone status available.'
+                    : <>No active cyclone in the North Indian Ocean (GDACS, checked just now).{cyc.list.length ? ` Recent: ${cyc.list.map((c) => `${c.name} (${fmtDate(c.from.slice(0, 10))}–${fmtDate(c.to.slice(0, 10))})`).join(', ')}.` : ''}</>}</p>
+                </div>
+              )}
+              <section className="rounded-[12px] border border-line bg-white/70 p-4 sm:p-5">
+                <p className="mb-2 font-display text-[15px] text-ink">Cyclone potential and cyclones, day by day</p>
+                <CycloneTimeline dates={dates} today={today} cyclones={cyc.list}
+                  lines={RS.map((r) => ({ label: REGIONS[r].label, color: RCOL[r], dashed: r === 'NIO', values: vals(ocpiOfRecord)(r) }))} />
+              </section>
+            </div>
+          )
+        })()}
+
         <div className="mt-8 grid items-stretch gap-2 md:grid-cols-[1.2fr_auto_1fr_auto_1.2fr_auto_1.2fr_auto_1fr]">
           {[
             ['#inputs', '01 · Satellite input', 'SST · SSS · SLA · currents · winds', 'bg-paper'],
             ['#outputs', '02 · Sylithe Ocean Model', '3-model ensemble, 15-day window', 'bg-ink text-paper'],
             ['#outputs', '03 · Ocean state', 'T 0–1000 m · TCHP · T100 · D26 · MLD', 'bg-paper'],
             ['#potential', '04 · Cyclone logic', 'OCPI · hotspots · disturbance watch', 'bg-[#A3E635]/25'],
-            ['#bulletin', '05 · LLM bulletin', 'DeepSeek, words only · planned', 'border-dashed bg-paper'],
+            ['#bulletin', '05 · LLM bulletin', 'DeepSeek, words only, number-checked', 'border-dashed bg-paper'],
           ].flatMap(([href, t, s, cls], i) => [
             i > 0 ? <ArrowRight key={`a${i}`} size={16} className="hidden self-center text-mute md:block" /> : null,
             <a key={t} href={href} className={`rounded-[10px] border border-line px-3 py-2.5 transition-colors hover:border-ink ${cls}`}>
@@ -268,8 +309,8 @@ export default function Cyclone() {
         </SectionHead>
         <div className="mt-6 space-y-6">
           {(() => { n++; return (
-            <Fig id="pot-ocpi" n={n} title="Ocean Cyclone Potential Index" caption={`(a) OCPI on ${fmtDate(date)}; numbered rings are the ${hs.length} strongest hotspots at least 4° apart, crosses are watch points (next figure). (b) OCPI of each area's mean conditions over time; the dashed line marks High (0.5).`}>
-              <FigMap g={m.grid} grid={f.ocpi} ramp="matter" range={[0, 1]} unit="OCPI" dp={2} tag="a" title={`OCPI, ${fmtDate(date)}`} marks={[...hsMarks, ...watchMarks]} threshold={0.5} />
+            <Fig id="pot-ocpi" n={n} title="Ocean Cyclone Potential Index" caption={`(a) OCPI on ${fmtDate(date)}; numbered rings are the ${hs.length} strongest hotspots at least 4° apart, crosses are watch points (next figure), black dots are cyclone positions within 2 days (GDACS). (b) OCPI of each area's mean conditions over time; the dashed line marks High (0.5).`}>
+              <FigMap g={m.grid} grid={f.ocpi} ramp="matter" range={[0, 1]} unit="OCPI" dp={2} tag="a" title={`OCPI, ${fmtDate(date)}`} marks={[...hsMarks, ...watchMarks, ...trackMarks]} threshold={0.5} />
               <Panel tag="b" title="OCPI of area-mean conditions" dates={dates} values={vals(ocpiOfRecord)} unit="" dp={2} marker={date} threshold={{ value: 0.5, label: 'High' }} />
             </Fig>) })()}
           {(() => { n++; return (
