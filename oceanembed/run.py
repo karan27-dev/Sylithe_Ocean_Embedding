@@ -111,8 +111,8 @@ class Run:
         argo_path = os.path.join(self.data, "argo_2023.parquet")
         prof = pd.read_parquet(argo_path) if os.path.exists(argo_path) else None
         lb = BM.Leaderboard(G, prof)
-        seeds = sorted(glob.glob(os.path.join(self.ck, "seed*", "glorys_best.pt")))
-        members = [load(p, self.cfg) for p in seeds]
+        seeds = TR.seed_checkpoints(self.ck)
+        members = [TR.load_model(p)[0] for p in seeds]
         if members:
             self.log(f"scoring OceanEmbed ({len(members)} members)")
             rec = I.reconstruct(members, self.inputs, self.S, *C.TEST, window=self.cfg.window)
@@ -125,7 +125,7 @@ class Run:
         if os.path.exists(p3):
             self.log("scoring the published method")
             lb.add("Attention 3D U-Net++ (Wang et al. 2026), retrained here", "published method (retrained here)",
-                   I.reconstruct(load(p3, self.cfg3), self.inputs, self.S, *C.TEST, window=self.cfg3.window).thetao)
+                   I.reconstruct(TR.load_model(p3)[0], self.inputs, self.S, *C.TEST, window=self.cfg3.window).thetao)
         ridge = os.path.join(self.root, "baselines", "ridge.npz")
         if os.path.exists(ridge):
             lb.add(B.Ridge.name, "baseline", I.reconstruct_baseline(B.Ridge(self.S).load(ridge), self.inputs, self.S,
@@ -145,7 +145,7 @@ class Run:
         """Console export (oceanembed/webexport.py): maps for --web-days, Argo scores over the whole test year."""
         from . import webexport as W
         self.stats()
-        seeds = sorted(glob.glob(os.path.join(self.ck, "seed*", "glorys_best.pt")))
+        seeds = TR.seed_checkpoints(self.ck)
         if not seeds:
             self.log("web: no trained OceanEmbed checkpoints yet, skipped")
             return

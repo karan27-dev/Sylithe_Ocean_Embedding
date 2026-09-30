@@ -206,6 +206,16 @@ def load_weights(model, ckpt):
     return model
 
 
+def seed_checkpoints(ck_dir: str) -> list[str]:
+    """Best checkpoints of the seed ensemble: only folders named exactly seed<digits>, so archived runs such as
+    seed42_v1_overfit are never averaged in."""
+    import re
+    if not os.path.isdir(ck_dir):
+        return []
+    dirs = sorted(d for d in os.listdir(ck_dir) if re.fullmatch(r"seed\d+", d))
+    return [p for d in dirs if os.path.exists(p := os.path.join(ck_dir, d, "glorys_best.pt"))]
+
+
 def load_model(ckpt):
     """Rebuild a trained network from its checkpoint alone: architecture and width come from the config saved
     with it, so evaluation can never pair weights with a differently-sized model. Returns (model, cfg)."""

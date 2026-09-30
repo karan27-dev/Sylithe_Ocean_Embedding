@@ -135,7 +135,7 @@ def run(data: str, root: str, out: str, window: int = C.TrainConfig.window, log=
 
     # ---------------------------------------------------------------- predictions for the test year
     methods: dict[str, tuple[str, xr.Dataset]] = {}
-    seeds = sorted(glob.glob(os.path.join(root, "checkpoints", f"oceanembed_w{window}", "seed*", "glorys_best.pt")))
+    seeds = TR.seed_checkpoints(os.path.join(root, "checkpoints", f"oceanembed_w{window}"))
     if seeds:
         members = [TR.load_model(p)[0] for p in seeds]
         log(f"OceanEmbed ensemble ({len(members)} members)")
