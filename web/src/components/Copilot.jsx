@@ -147,21 +147,35 @@ export default function Copilot() {
   const ask = async (text) => {
     setLog((l) => [...l, { who: 'you', text }, { who: 'Sylithe agent', text: '…', pending: true }])
     setQ('')
-    let reply
-    try {
-      const history = log.filter((e) => !e.pending).map((e) => ({ role: e.who === 'you' ? 'user' : 'assistant', content: e.text }))
-      const r = await fetch('/api/agent', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: text, history, context: await liveContext(view, window.location.pathname) }) })
-      const j = await r.json().catch(() => ({}))
-      if (r.ok) reply = j.answer
-    } catch { /* endpoint unreachable: answer locally */ }
+    const ctx = await liveContext(view, window.location.pathname)
+    let reply = null
+    // 1 · the common questions are answered from live data directly: exact numbers, no language-model call
+    const local = await localAnswer(text, ctx).catch(() => null)
+    if (local) reply = local
+    // 2 · the same question asked recently: reuse the saved answer
+    const key = `sylithe-agent:${text.trim().toLowerCase().replace(/\s+/g, ' ')}:${ctx.cyclone_today?.date ?? ''}`
     if (!reply) {
-      const local = await localAnswer(text, await liveContext(view, window.location.pathname)).catch(() => null)
-      reply = local ? `${local}\n\n· Answered from live data (DeepSeek not connected on this server).`
-        : 'DeepSeek is not connected on this server, and this question needs it. Without it I can answer about cyclone potential and hotspots, accuracy, errors by depth, the benchmark, live status and the model. Map commands such as "temperature at 150 m" also work.'
+      try { const c = JSON.parse(localStorage.getItem(key) || 'null'); if (c && Date.now() - c.at < 6 * 3600e3) reply = c.text } catch { /* storage unavailable */ }
     }
+    // 3 · otherwise DeepSeek on the server (rate-limited and cached there too)
+    if (!reply) {
+      try {
+        const history = log.filter((e) => !e.pending).slice(-4).map((e) => ({ role: e.who === 'you' ? 'user' : 'assistant', content: e.text }))
+        const r = await fetch('/api/agent', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: text.slice(0, 600), history, context: ctx }) })
+        const j = await r.json().catch(() => ({}))
+        if (r.ok && j.answer) {
+          reply = j.answer
+          try { localStorage.setItem(key, JSON.stringify({ at: Date.now(), text: reply })) } catch { /* ignore */ }
+        } else if (j.error === 'rate_limited') {
+          reply = j.scope === 'ip' ? 'You have asked many questions in the last hour, so free-form answers are paused for a while. I can still answer about cyclone potential, accuracy, errors by depth, the benchmark, live status and the model, and map commands work.'
+            : 'The agent has reached today\'s question budget. I can still answer about cyclone potential, accuracy, errors by depth, the benchmark, live status and the model, and map commands work.'
+        }
+      } catch { /* endpoint unreachable */ }
+    }
+    if (!reply) reply = 'I could not reach the language model just now. I can answer about cyclone potential and hotspots, accuracy, errors by depth, the benchmark, live status and the model, and map commands such as "temperature at 150 m" work.'
     setLog((l) => [...l.filter((e) => !e.pending), { who: 'Sylithe agent', text: reply }])
   }
+
 
   const run = async (text) => {
     if (!text.trim() || !m) return

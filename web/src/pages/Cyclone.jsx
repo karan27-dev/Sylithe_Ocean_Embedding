@@ -154,7 +154,11 @@ export default function Cyclone() {
   // the Sylithe agent words today's bulletin live (DeepSeek via /api/agent); numbers are checked before it is shown
   const payloadKey = m && day && series && f && sum ? date : null
   useEffect(() => {
-    if (!payloadKey || agentText[payloadKey]) return
+    if (!payloadKey || agentText[payloadKey] || bull === undefined) return        // wait until the published bulletin is known
+    // a checked bulletin from the 6-hourly run already covers this day: no call needed
+    if (bull?.llm?.checked && bull.date === date) return
+    const saved = (() => { try { return JSON.parse(localStorage.getItem(`sylithe-bulletin:${date}`) || 'null') } catch { return null } })()
+    if (saved && Date.now() - saved.at < 6 * 3600e3) { setAgentText((a) => ({ ...a, [date]: { state: 'ok', text: saved.text, model: saved.model } })); return }
     const recs0 = Object.fromEntries(RS.map((r) => [r, series.days[date]?.[r]]))
     const prev0 = Object.fromEntries(RS.map((r) => [r, series.days[addDays(date, -7)]?.[r]]))
     const p = buildPayload({ date, live, run: index?.runs?.[date], sum, recs: recs0, prev: prev0, hs, watch, dayObj: day, m })
@@ -163,9 +167,11 @@ export default function Cyclone() {
       .then((r) => (r.ok ? r.json() : null)).catch(() => null)
       .then((j) => {
         const t = j?.answer
-        setAgentText((a) => ({ ...a, [date]: t && !untraced(t, p).length ? { state: 'ok', text: t, model: j.model } : { state: 'none' } }))
+        const ok = t && !untraced(t, p).length
+        if (ok) { try { localStorage.setItem(`sylithe-bulletin:${date}`, JSON.stringify({ at: Date.now(), text: t, model: j.model })) } catch { /* ignore */ } }
+        setAgentText((a) => ({ ...a, [date]: ok ? { state: 'ok', text: t, model: j.model } : { state: 'none' } }))
       })
-  }, [payloadKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [payloadKey, bull]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!m || !day || !series || !f) return <div className="page min-h-[70vh] pt-16"><p className="label">Loading the live ocean state…</p></div>
 
