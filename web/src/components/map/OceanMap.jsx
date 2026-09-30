@@ -10,7 +10,7 @@ const WORLD = [[-85, -180], [-85, 180], [85, 180], [85, -180]]
 const HOLE = [[5, 45], [30, 45], [30, 105], [5, 105]]
 
 /** Image overlay that cross-fades to each new field instead of blinking: depth and date changes read as motion. */
-function FadeOverlay({ url, bounds }) {
+function FadeOverlay({ url, bounds, opacity = 1 }) {
   const map = useMap()
   const cur = useRef(null)
   useEffect(() => {
@@ -18,11 +18,12 @@ function FadeOverlay({ url, bounds }) {
     const next = L.imageOverlay(url, bounds, { opacity: 0, className: 'data', interactive: false }).addTo(map)
     const prev = cur.current
     cur.current = next
-    const show = () => requestAnimationFrame(() => next.setOpacity(1))
+    const show = () => requestAnimationFrame(() => next.setOpacity(opacity))
     next.once('load', show)
     const t = prev && setTimeout(() => map.removeLayer(prev), 320)
     return () => { clearTimeout(t) }
   }, [url]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { cur.current?.setOpacity(opacity) }, [opacity])
   useEffect(() => () => { cur.current && map.removeLayer(cur.current) }, [map])
   return null
 }
@@ -82,7 +83,7 @@ function Framer({ region, padding }) {
 const IMAGERY = 'https://server.arcgisonline.com/ArcGIS/rest/services'
 
 export default function OceanMap({ g, url, grid, probe, onPick, onHover, points, onPoint, region = 'NIO', showRegion = true,
-  padding = [24, 24], zoomControl = true, scrollZoom = true, basemap = 'light', className = '', children }) {
+  padding = [24, 24], zoomControl = true, scrollZoom = true, basemap = 'light', opacity = 1, className = '', children }) {
   const sat = basemap === 'satellite'
 
   const bounds = gridBounds(g)
@@ -98,7 +99,7 @@ export default function OceanMap({ g, url, grid, probe, onPick, onHover, points,
         <TileLayer key="light" url={`${ESRI}/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}`} maxNativeZoom={16}
           attribution="Basemap © Esri" />
       )}
-      <FadeOverlay url={url} bounds={bounds} />
+      <FadeOverlay url={url} bounds={bounds} opacity={opacity} />
       {/* place names sit above the data, below markers */}
       <Pane name="labels" style={{ zIndex: 450, pointerEvents: 'none' }}>
         {sat ? (
