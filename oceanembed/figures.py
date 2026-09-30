@@ -110,7 +110,9 @@ class Figs:
         if not os.path.exists(p) or os.path.getsize(p) < 10:
             return
         t = pd.read_csv(p)
-        runs = [r for r in t.run.unique() if r.endswith("glorys")]
+        import re
+        # final runs only: seed<digits>/glorys for ours, the published method; archived runs (e.g. *_v1_overfit) left out
+        runs = [r for r in t.run.unique() if r.endswith("glorys") and ("attn" in r or re.search(r"/seed\d+/glorys$", r))]
         if not runs:
             return
         fig, ax = plt.subplots(figsize=(5.2, 3.2))
