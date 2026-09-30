@@ -55,14 +55,13 @@ function CopyBtn({ text, label = 'Copy' }) {
 }
 
 // ---------------------------------------------------------------- LLM hand-off
-const PROMPT = `You write the daily ocean-heat bulletin of the Sylithe Ocean Model for cyclone forecasters.
-Use ONLY the numbers in the JSON below; never invent, round differently or add numbers.
-Do not forecast cyclone genesis, track, intensity or landfall: the data describe the ocean only;
-vertical wind shear, humidity and other atmospheric conditions are not assessed.
-Write 120–180 words: a one-line headline, then Bay of Bengal, Arabian Sea, hotspots
-(with coordinates and their strongest drivers), any disturbance-over-warm-ocean watch points,
-the 7-day change, and the caveats listed in the JSON.`
-
+/** Agent text → paragraphs with **bold** labels (the model writes light markdown). */
+function rich(t) {
+  return t.split(/\n{2,}|\n(?=\*\*)/).map((para, i) => (
+    <p key={i} className={`mb-2.5 whitespace-pre-line ${i ? '' : 'text-[15px] text-ink'}`}>
+      {para.split(/(\*\*[^*]+\*\*)/).map((seg, j) => (seg.startsWith('**') ? <b key={j} className="font-medium text-ink">{seg.slice(2, -2)}</b> : seg))}
+    </p>))
+}
 function buildPayload({ date, live, run, sum, recs, prev, hs, watch, dayObj, m }) {
   const region = (r) => {
     const a = recs[r] ?? {}, p = prev[r] ?? {}
@@ -117,7 +116,7 @@ export default function Cyclone() {
   const [date, setDate] = useState(null)
   const [region, setRegion] = useState('BoB')
   const [depthK, setDepthK] = useState(DEPTHS.indexOf(100))
-  const [view, setView] = useState('text')
+  const [view, setView] = useState(null)
 
   useEffect(() => { if (m && (!date || !m.days.some((d) => d.date === date))) setDate(m.days[m.days.length - 1].date) }, [m, date])
   const day = useDay(m, date)
@@ -159,7 +158,8 @@ export default function Cyclone() {
   const text = bulletinText(payload)
   const json = JSON.stringify(payload, null, 2)
   const llm = bull?.llm?.text && bull.llm.checked && bull.date === date ? bull.llm : null
-  const llmState = llm ? 'DeepSeek · number check passed' : bull?.llm?.error ? 'DeepSeek call failed · template shown'
+  const bView = view ?? (llm ? 'llm' : 'text')
+  const llmState = llm ? 'Sylithe agent (DeepSeek) · numbers verified' : bull?.llm?.error ? 'DeepSeek call failed · template shown'
     : bull?.llm && !bull.llm.checked ? 'DeepSeek answer rejected by the number check · template shown' : 'DeepSeek: add DEEPSEEK_API_KEY to switch on'
   const z = DEPTHS[depthK]
   const rr = (grid, sym) => grid && robustRange(grid, sym)
@@ -240,6 +240,26 @@ export default function Cyclone() {
                   shaded band shows a persistence outlook (the latest value carried forward, since upper-ocean heat changes over weeks) and the coordinates where
                   potential is High today. (b) Cyclones reported by GDACS (JTWC tracks): solid = observed, hollow = official forecast.</p>
               </section>
+              {/* ---------------- Sylithe agent bulletin */}
+              <section id="bulletin" className="mt-4 scroll-mt-28 rounded-[12px] border border-[#EBDCCB] bg-[#FAF0E6]/60">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#EBDCCB] px-5 py-3">
+                  <div className="flex items-center gap-2.5">
+                    <img src="/sylithe-logo.png" alt="" className="h-6 w-6" />
+                    <div><p className="text-[14.5px] font-medium text-ink">Sylithe agent · ocean bulletin for {fmtDate(bull?.date ?? date)}</p>
+                      <p className="text-[11.5px] text-mute">From every satellite input, the predicted ocean column and the cyclone logic; the agent words it, every number is checked.</p></div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="seg">{[...(llm ? [['llm', 'Sylithe agent']] : []), ['text', 'Template'], ['json', 'Data (JSON)']].map(([k, l]) =>
+                      <button key={k} aria-pressed={bView === k} onClick={() => setView(k)}>{l}</button>)}</div>
+                    <span className="hidden items-center gap-1.5 text-[11.5px] text-mute md:inline-flex"><span className={`h-1.5 w-1.5 rounded-full ${llm ? 'bg-[#4D9F6A]' : 'bg-[#E0A526]'}`} />{llmState}</span>
+                    <CopyBtn text={bView === 'llm' && llm ? llm.text : bView === 'json' ? json : text.join('\n\n')} />
+                  </div>
+                </div>
+                {bView === 'llm' && llm && <div className="px-5 py-4 text-[14px] leading-relaxed text-ink2">{rich(llm.text)}</div>}
+                {bView === 'text' && <div className="space-y-2.5 px-5 py-4 text-[14px] leading-relaxed text-ink2">{text.map((t, i) => <p key={i} className={i ? '' : 'font-medium text-ink'}>{t}</p>)}</div>}
+                {bView === 'json' && <pre className="num max-h-[460px] overflow-auto rounded-b-[12px] bg-[#0F172A] px-5 py-4 text-[11.5px] leading-relaxed text-[#E2E8F0]">{json}</pre>}
+                <p className="border-t border-[#EBDCCB] px-5 py-2.5 text-[11px] text-faint">Ocean conditions only, not a cyclone forecast. For operational decisions use IMD and INCOIS advisories.</p>
+              </section>
             </div>
           )
         })()}
@@ -250,7 +270,7 @@ export default function Cyclone() {
             ['#outputs', '02 · Sylithe Ocean Model', '3-model ensemble, 15-day window', ''],
             ['#outputs', '03 · Ocean state', 'T 0–1000 m · TCHP · T100 · D26 · MLD', ''],
             ['#potential', '04 · Cyclone logic', 'OCPI · hotspots · disturbance watch', ''],
-            ['#bulletin', '05 · LLM bulletin', 'DeepSeek, words only, number-checked', ''],
+            ['#bulletin', '05 · Sylithe agent', 'bulletin and suggestions, numbers verified', ''],
           ].flatMap(([href, t, s, cls], i) => [
             i > 0 ? <ArrowRight key={`a${i}`} size={16} className="hidden self-center text-mute md:block" /> : null,
             <a key={t} href={href} className={`rounded-[10px] border border-[#EBDCCB] bg-[#FAF0E6] px-3 py-2.5 text-ink transition-colors hover:border-[#D9722B] ${cls}`}>
@@ -373,28 +393,6 @@ export default function Cyclone() {
           <p className="mt-2 text-[11.5px] text-faint">Categories: {CATS.slice().reverse().map((c) => `${c.label} ≥ ${c.min}`).join(' · ')}. A driver missing on a day (e.g. late salinity) is left out and the weights are rescaled.</p>
         </div>
 
-        {/* ================================================ bulletin */}
-        <SectionHead id="bulletin" className="scroll-mt-28 pt-16" label="04 · Bulletin" title="Numbers in, words out">
-          The bulletin below is written by a fixed template. The next step hands the same structured numbers to a language model (DeepSeek) with the
-          prompt shown, so it can word the bulletin for forecasters. It never sees maps, never computes anything and is told to use only these numbers.
-        </SectionHead>
-        <div className="mt-6 rounded-[12px] border border-line bg-white/70">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-2.5">
-            <div className="seg">{[...(llm ? [['llm', 'DeepSeek bulletin']] : []), ['text', 'Template bulletin'], ['json', 'LLM input (JSON)'], ['prompt', 'LLM prompt']].map(([k, l]) =>
-              <button key={k} aria-pressed={view === k} onClick={() => setView(k)}>{l}</button>)}</div>
-            <div className="flex items-center gap-4">
-              <span className="inline-flex items-center gap-1.5 text-[11.5px] text-mute"><span className={`h-1.5 w-1.5 rounded-full ${llm ? 'bg-[#4D9F6A]' : 'bg-[#E0A526]'}`} />{llmState}</span>
-              <CopyBtn text={view === 'llm' && llm ? llm.text : view === 'json' ? json : view === 'prompt' ? `${PROMPT}\n\n${json}` : text.join('\n\n')} />
-            </div>
-          </div>
-          {view === 'llm' && llm && <div className="whitespace-pre-line px-5 py-5 text-[14px] leading-relaxed text-ink2">{llm.text}
-            <p className="mt-3 text-[11px] text-faint">Worded by {llm.model} from the JSON input; every number was checked against it.</p></div>}
-          {view === 'text' && <div className="space-y-3 px-5 py-5 text-[14px] leading-relaxed text-ink2">{text.map((t, i) => <p key={i} className={i ? '' : 'font-medium text-ink'}>{t}</p>)}</div>}
-          {view === 'json' && <pre className="num max-h-[520px] overflow-auto bg-[#0F172A] px-5 py-4 text-[11.5px] leading-relaxed text-[#E2E8F0]">{json}</pre>}
-          {view === 'prompt' && <pre className="num whitespace-pre-wrap px-5 py-4 text-[12.5px] leading-relaxed text-ink">{PROMPT}{'\n\n<JSON input>'}</pre>}
-        </div>
-        <p className="mt-3 text-[11.5px] text-faint">Every number is computed in the browser from the published prediction. For operational decisions use IMD and INCOIS advisories.
-          More on the method in the <Link className="link" to="/docs">Docs</Link>.</p>
       </div>
     </div>
   )
