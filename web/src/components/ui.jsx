@@ -36,9 +36,9 @@ export function SourceStatus({ compact = false }) {
 }
 
 /** Editorial section opener: an instrument label, a serif title, an optional lede. */
-export function SectionHead({ label, title, children, className = '', as: H = 'h2' }) {
+export function SectionHead({ id, label, title, children, className = '', as: H = 'h2' }) {
   return (
-    <div className={className}>
+    <div id={id} className={className}>
       {label && <p className="label mb-3">{label}</p>}
       <H className={`display ${H === 'h1' ? 'text-[34px] sm:text-[42px] leading-[1.05]' : 'text-[24px] sm:text-[28px] leading-[1.15]'}`}>{title}</H>
       {children && <div className="mt-3 max-w-[62ch] text-[15px] leading-relaxed text-ink2">{children}</div>}
