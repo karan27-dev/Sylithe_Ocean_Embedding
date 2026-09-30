@@ -154,6 +154,7 @@ export default function Daily() {
 
   // days the charts cover: presets use the pipeline's statistics (every cached day), a custom area the mapped days
   const pool = isCustom ? mapped : all
+  const rangeOk = (nd) => nd <= 30 || pool.length >= Math.ceil(nd / 2)
   const n = RANGES.find((r) => r[0] === range)[2]
   const dates = useMemo(() => (date ? pool.filter((d) => d > addDays(date, -n) && d <= date) : []), [pool, date, n])
   // a custom area needs every day's grid: fetch the selected day and its comparisons first, then the range, newest first
@@ -315,8 +316,10 @@ export default function Daily() {
             </Side>
 
             <Side n={5} title="Analysis range" aside={RANGES.find((r) => r[0] === range)[1]}>
-              <div className="seg w-full">{RANGES.map(([k, l]) => <button key={k} className="flex-1" aria-pressed={range === k} onClick={() => setRange(k)}>{l}</button>)}</div>
-              <p className="mt-2 text-[11.5px] text-mute">Graphs below the map cover {dates.length} day{dates.length === 1 ? '' : 's'} ending {fmtDate(date)}{isCustom ? ' (custom areas: mapped days only)' : ''}.</p>
+              <div className="seg w-full">{RANGES.map(([k, l, nd]) => <button key={k} className="flex-1 disabled:cursor-not-allowed disabled:opacity-35" aria-pressed={range === k}
+                disabled={!rangeOk(nd)} title={rangeOk(nd) ? '' : `Needs ${Math.ceil(nd / 2)}+ predicted days; ${pool.length} so far`} onClick={() => setRange(k)}>{l}</button>)}</div>
+              <p className="mt-2 text-[11.5px] text-mute">Graphs below the map cover {dates.length} day{dates.length === 1 ? '' : 's'} ending {fmtDate(date)}{isCustom ? ' (custom areas: mapped days only)' : ''}.
+                {' '}{pool.length} days of history so far; Quarter and Year open as the live record grows (or after a history backfill).</p>
             </Side>
 
             {today && (
@@ -377,7 +380,8 @@ export default function Daily() {
       <div id="analysis" className="sticky top-[var(--bar)] z-[900] border-b border-line bg-paper/95 backdrop-blur">
         <div className="page flex flex-wrap items-center gap-x-5 gap-y-2 py-2.5 text-[12.5px]">
           <span className="text-ink">{areaLabel}</span><span className="num text-mute">{fmtDate(date)}</span><span className="num text-mute">{z} m</span>
-          <div className="seg">{RANGES.map(([k, l]) => <button key={k} aria-pressed={range === k} onClick={() => setRange(k)}>{l}</button>)}</div>
+          <div className="seg">{RANGES.map(([k, l, nd]) => <button key={k} className="disabled:cursor-not-allowed disabled:opacity-35" aria-pressed={range === k}
+            disabled={!rangeOk(nd)} title={rangeOk(nd) ? '' : `Needs ${Math.ceil(nd / 2)}+ predicted days; ${pool.length} so far`} onClick={() => setRange(k)}>{l}</button>)}</div>
           <button onClick={toMap} className="ml-auto flex items-center gap-1 text-mute hover:text-ink"><ArrowUp size={13} />Map and controls</button>
         </div>
       </div>
