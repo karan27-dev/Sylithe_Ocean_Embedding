@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowDown, ArrowUp, ChevronDown, ChevronLeft, ChevronRight, Download, FileUp, MousePointer2, Pentagon, Square, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, ChevronDown, ChevronLeft, ChevronRight, Download, Eye, EyeOff, FileUp, MousePointer2, Pentagon, Square, Trash2 } from 'lucide-react'
 import OceanMap from '../components/map/OceanMap'
 import AoiTools from '../components/map/AoiTools'
 import Legend from '../components/map/Legend'
@@ -131,17 +131,28 @@ function SideTool({ on, onClick, title, children, className = '' }) {
   )
 }
 
+function MapBtn({ on, onClick, title, children }) {
+  return (
+    <button onClick={onClick} title={title} aria-pressed={on}
+      className={`flex h-9 items-center gap-1.5 rounded-[8px] border px-2.5 text-[12px] shadow-sm backdrop-blur transition-colors ${on ? 'border-ink bg-ink text-[#A3E635]' : 'border-line bg-paper/95 text-ink2 hover:text-ink'}`}>
+      {children}
+    </button>
+  )
+}
+
 const field = 'h-9 w-full rounded-[7px] border border-line bg-paper px-2.5 text-[13px] text-ink focus:border-sea focus:outline-none'
 
-/** Cursor readout; owns its state so mouse moves do not re-render the page. */
-function HoverChip({ bind, layer, depth }) {
+/** Legend and cursor readout for the sidebar; the readout owns its state so mouse moves do not re-render the page. */
+function CursorReadout({ bind, layer, depth }) {
   const [h, set] = useState(null)
   useEffect(() => { bind.current = set }, [bind])
-  if (!h || !Number.isFinite(h.v)) return null
+  const ok = h && Number.isFinite(h.v)
   return (
-    <div className="pointer-events-none absolute bottom-3 left-1/2 z-[700] -translate-x-1/2 rounded-full bg-ink/85 px-3 py-1.5 text-[11.5px] text-paper backdrop-blur">
-      <span className="num">{fmtLat(h.lat)} {fmtLon(h.lon)}</span><span className="mx-2 text-paper/40">·</span>
-      {layer.label}{layer.perDepth ? ` ${depth} m` : ''} <span className="num text-[#A3E635]">{fmt(h.v, layer.dp)} {layer.unit}</span>
+    <div className="mt-2.5 flex items-baseline justify-between gap-2 rounded-[7px] border border-line bg-paper px-2.5 py-2 text-[11.5px]">
+      {ok ? <>
+        <span className="num text-mute">{fmtLat(h.lat)} {fmtLon(h.lon)}</span>
+        <span className="num text-[15px] text-ink">{fmt(h.v, layer.dp)} <span className="text-[11px] text-mute">{layer.unit}</span></span>
+      </> : <span className="text-faint">Move the cursor over the ocean to read {layer.label.toLowerCase()}{layer.perDepth ? ` at ${depth} m` : ''}</span>}
     </div>
   )
 }
@@ -176,6 +187,7 @@ export default function Daily() {
   const [err, setErr] = useState(null)
   const fileRef = useRef(null)
   const hoverRef = useRef(null)
+  const [visible, setVisible] = useState(true)
   const [frame, setFrame] = useState('BoB')           // region the map is framed on
   useEffect(() => { if (area in REGIONS) setFrame(area) }, [area])
 
@@ -260,7 +272,7 @@ export default function Daily() {
         <aside className="flex shrink-0 flex-col border-line bg-paper lg:w-[348px] lg:border-r">
           <div className="border-b border-line px-4 pb-4 pt-4">
             <p className="label">Sylithe Ocean Model · real-time prediction</p>
-            <h1 className="display mt-1 text-[22px] leading-tight text-ink">Ocean temperature, surface to 1000 m</h1>
+            <h1 className="display mt-1 text-[22px] leading-tight text-ink">Ocean temperature, 0–1000 m</h1>
             <div className="mt-3 flex items-center justify-between gap-2">
               {modeSwitch}
               <span className="text-right text-[11px] text-mute">{live ? (status ? <>Checked {ago(status.updated_at)}<br />every 6 h</> : '') : 'Reprocessed 2023'}</span>
@@ -363,27 +375,39 @@ export default function Daily() {
             )}
           </div>
 
+          <div className="border-t border-line bg-wash/70 px-4 py-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="truncate text-[12px] text-ink">{L_.label}{L_z} · <span className="num text-mute">{fmtDate(date)}</span></p>
+              <button onClick={() => setVisible((v) => !v)} title={visible ? 'Hide the layer' : 'Show the layer'} className="text-mute hover:text-ink">
+                {visible ? <Eye size={15} /> : <EyeOff size={15} />}</button>
+            </div>
+            {crange ? <Legend className="mt-2" layer={L_} range={crange} width="100%" marks={layer === 'tchp' ? [{ v: 50, label: '50 kJ cm⁻²' }] : []} />
+              : <p className="mt-1 text-[11px] text-mute">{mapped.includes(date) ? 'Loading…' : `No map for this day: maps cover the last ${mapped.length} days.`}</p>}
+            <CursorReadout bind={hoverRef} layer={L_} depth={z} />
+          </div>
           <button onClick={toAnalysis} className="flex items-center justify-center gap-2 border-t border-line bg-ink px-4 py-3 text-[13px] text-paper hover:text-[#A3E635]">
             Full analysis below <ArrowDown size={14} /></button>
         </aside>
 
         <div className="relative h-[70vh] min-w-0 flex-1 lg:h-auto">
           {ops && (
-            <OceanMap g={ops.grid} url={url} grid={grid} region={frame} showRegion={false} basemap={basemap} opacity={opacity} scrollZoom
+            <OceanMap g={ops.grid} url={url} grid={grid} region={frame} showRegion={false} basemap={basemap} opacity={visible ? opacity : 0} scrollZoom
               onPick={draw ? null : (c) => setProbe(c)} onHover={(c) => hoverRef.current?.(c)} probe={probe} padding={[30, 30]}>
-              <AoiTools aoi={aoi} mode={draw} onDone={onDrawn} />
+              <AoiTools aoi={isCustom ? aoi : null} mode={draw} onDone={onDrawn} color="#F8FAFC" />
             </OceanMap>
           )}
-          <div className="absolute left-3 top-3 z-[700] rounded-[10px] border border-line bg-paper/95 px-3 py-2.5 backdrop-blur">
-            <p className="text-[12px] text-ink">{L_.label}{L_z} · <span className="num">{fmtDate(date)}</span></p>
-            {crange ? <Legend className="mt-2" layer={L_} range={crange} width={240} marks={layer === 'tchp' ? [{ v: 50, label: '50 kJ cm⁻²' }] : []} />
-              : <p className="mt-1 max-w-[240px] text-[11px] text-mute">{mapped.includes(date) ? 'Loading…' : `No map for this day: maps cover the last ${mapped.length} days.`}</p>}
+          <div className="absolute right-14 top-3 z-[700] flex flex-wrap justify-end gap-1.5">
+            <MapBtn on={visible} onClick={() => setVisible((v) => !v)} title={visible ? 'Hide the layer' : 'Show the layer'}>
+              {visible ? <Eye size={14} /> : <EyeOff size={14} />}{L_.short ?? L_.label}</MapBtn>
+            <MapBtn onClick={() => fileRef.current?.click()} title="Upload KML, KMZ, GeoJSON or a zipped shapefile"><FileUp size={14} />KML / AOI</MapBtn>
+            <MapBtn on={draw === 'rect'} onClick={() => setDraw(draw === 'rect' ? null : 'rect')} title="Drag to draw a rectangle"><Square size={14} /></MapBtn>
+            <MapBtn on={draw === 'poly'} onClick={() => setDraw(draw === 'poly' ? null : 'poly')} title="Draw a polygon: click points, double-click to finish"><Pentagon size={14} />Polygon</MapBtn>
+            {custom && <MapBtn onClick={() => { setCustom(null); setArea('BoB') }} title="Remove the custom area"><Trash2 size={14} /></MapBtn>}
           </div>
-          {draw && <p className="absolute left-1/2 top-3 z-[700] -translate-x-1/2 rounded-full bg-ink/85 px-3 py-1.5 text-[12px] text-paper">
+          {draw && <p className="absolute left-1/2 top-16 z-[700] -translate-x-1/2 rounded-full bg-ink/85 px-3 py-1.5 text-[12px] text-paper">
             {draw === 'rect' ? 'Press and drag to draw a rectangle' : 'Click to add points · double-click or click the first point to finish'}</p>}
-          <HoverChip bind={hoverRef} layer={L_} depth={z} />
           {probe && probeCol && (
-            <div className="absolute right-14 top-3 z-[700] w-[280px] rounded-[10px] border border-line bg-paper/95 p-3 backdrop-blur">
+            <div className="absolute right-14 top-16 z-[700] w-[280px] rounded-[10px] border border-line bg-paper/95 p-3 backdrop-blur">
               <div className="flex items-baseline justify-between"><p className="label">Point · {fmtLat(probe.lat)} {fmtLon(probe.lon)}</p>
                 <button onClick={() => setProbe(null)} className="text-[11px] text-mute hover:text-ink">Close</button></div>
               <ProfileChart main={{ label: 'Prediction', values: probeCol, sigma: probeSig }} height={230} />
