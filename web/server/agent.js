@@ -7,7 +7,8 @@ import { createHash } from 'node:crypto'
 const API = 'https://api.deepseek.com/chat/completions'
 
 // ---------------------------------------------------------------- budget guards (per server instance)
-const LIMIT_PER_IP_HOUR = 20                // DeepSeek calls one visitor may cause per hour
+const LIMIT_PER_IP_HOUR = 20                // DeepSeek calls one IP address may cause per hour
+const LIMIT_PER_IP_DAY = 60                 // … and per day
 const LIMIT_PER_DAY = 400                   // DeepSeek calls per day for the whole site (per instance)
 const CACHE_MS = 6 * 3600e3                 // identical requests reuse the answer for 6 h (one live run)
 const hits = new Map()                      // ip → [timestamps]
@@ -19,8 +20,9 @@ function allow(ip) {
   const now = Date.now(), today = new Date().toISOString().slice(0, 10)
   if (day.key !== today) day = { key: today, n: 0 }
   if (day.n >= LIMIT_PER_DAY) return 'day'
-  const h = (hits.get(ip) ?? []).filter((t) => now - t < 3600e3)
-  if (h.length >= LIMIT_PER_IP_HOUR) { hits.set(ip, h); return 'ip' }
+  const h = (hits.get(ip) ?? []).filter((t) => now - t < 86400e3)
+  if (h.filter((t) => now - t < 3600e3).length >= LIMIT_PER_IP_HOUR) { hits.set(ip, h); return 'ip' }
+  if (h.length >= LIMIT_PER_IP_DAY) { hits.set(ip, h); return 'ip_day' }
   h.push(now); hits.set(ip, h); day.n++
   if (hits.size > 5000) hits.clear()
   return null
@@ -69,10 +71,13 @@ SYLITHE OCEAN MODEL (SIH 2026, problem statement 26066, MoES / INCOIS)
 `
 
 const SYSTEM = `You are the Sylithe agent, the assistant of the Sylithe Ocean Model website.
-Answer questions about the model, its predictions, validation, the live system and the cyclone logic.
+Visitors may ask anything. Questions about the Sylithe Ocean Model, its predictions, validation, the live system, the website
+or the cyclone logic are answered from the FACTS and LIVE CONTEXT below; other questions (oceanography, cyclones, climate,
+machine learning, how to use the site, or anything general) are answered from your general knowledge.
 Rules:
-- Use only the FACTS and the LIVE CONTEXT below. Quote numbers exactly as given; never invent or extrapolate numbers.
-- If the answer is not in them, say so plainly and point to the page that would show it.
+- For anything about this model or today's ocean, quote numbers exactly as given in FACTS / LIVE CONTEXT; never invent or
+  extrapolate them. If such a number is not there, say so and point to the page that would show it.
+- For general questions, answer normally and say when something is general knowledge rather than a Sylithe result.
 - Never forecast cyclone genesis, track, intensity or landfall; describe ocean conditions only, and refer to IMD / INCOIS for official advisories.
 - Be specific and short: 2–6 sentences or a compact list. Use units. No marketing language.
 FACTS:${FACTS}`

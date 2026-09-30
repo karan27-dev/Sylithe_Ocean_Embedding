@@ -148,16 +148,11 @@ export default function Copilot() {
     setLog((l) => [...l, { who: 'you', text }, { who: 'Sylithe agent', text: '…', pending: true }])
     setQ('')
     const ctx = await liveContext(view, window.location.pathname)
-    let reply = null
-    // 1 · the common questions are answered from live data directly: exact numbers, no language-model call
-    const local = await localAnswer(text, ctx).catch(() => null)
-    if (local) reply = local
-    // 2 · the same question asked recently: reuse the saved answer
+    let reply = null, limited = null
+    // 1 · the same question asked recently: reuse the saved answer
     const key = `sylithe-agent:${text.trim().toLowerCase().replace(/\s+/g, ' ')}:${ctx.cyclone_today?.date ?? ''}`
-    if (!reply) {
-      try { const c = JSON.parse(localStorage.getItem(key) || 'null'); if (c && Date.now() - c.at < 6 * 3600e3) reply = c.text } catch { /* storage unavailable */ }
-    }
-    // 3 · otherwise DeepSeek on the server (rate-limited and cached there too)
+    try { const c = JSON.parse(localStorage.getItem(key) || 'null'); if (c && Date.now() - c.at < 6 * 3600e3) reply = c.text } catch { /* storage unavailable */ }
+    // 2 · DeepSeek on the server: any question, rate-limited per IP address and cached there too
     if (!reply) {
       try {
         const history = log.filter((e) => !e.pending).slice(-4).map((e) => ({ role: e.who === 'you' ? 'user' : 'assistant', content: e.text }))
@@ -166,15 +161,21 @@ export default function Copilot() {
         if (r.ok && j.answer) {
           reply = j.answer
           try { localStorage.setItem(key, JSON.stringify({ at: Date.now(), text: reply })) } catch { /* ignore */ }
-        } else if (j.error === 'rate_limited') {
-          reply = j.scope === 'ip' ? 'You have asked many questions in the last hour, so free-form answers are paused for a while. I can still answer about cyclone potential, accuracy, errors by depth, the benchmark, live status and the model, and map commands work.'
-            : 'The agent has reached today\'s question budget. I can still answer about cyclone potential, accuracy, errors by depth, the benchmark, live status and the model, and map commands work.'
-        }
+        } else if (j.error === 'rate_limited') limited = j.scope
       } catch { /* endpoint unreachable */ }
     }
-    if (!reply) reply = 'I could not reach the language model just now. I can answer about cyclone potential and hotspots, accuracy, errors by depth, the benchmark, live status and the model, and map commands such as "temperature at 150 m" work.'
+    // 3 · fallback: exact answers from live data for the common questions
+    if (!reply) {
+      const note = limited === 'ip' ? 'You have reached the limit of 20 questions per hour.'
+        : limited === 'ip_day' ? 'You have reached the limit of 60 questions per day.'
+          : limited === 'day' ? 'The agent has reached today\'s question budget.' : 'The language model is not reachable just now.'
+      const local = await localAnswer(text, ctx).catch(() => null)
+      reply = local ? `${local}\n\n· ${note} This answer comes straight from the live data.`
+        : `${note} Until then I can answer about cyclone potential and hotspots, accuracy, errors by depth, the benchmark, live status and the model, and map commands such as "temperature at 150 m" work.`
+    }
     setLog((l) => [...l.filter((e) => !e.pending), { who: 'Sylithe agent', text: reply }])
   }
+
 
 
   const run = async (text) => {
@@ -217,7 +218,7 @@ export default function Copilot() {
         <header className="flex items-center justify-between border-b border-line px-5 py-4">
           <div>
             <p className="display flex items-center gap-2 text-[19px] leading-none"><img src="/sylithe-logo.png" alt="" className="h-6 w-6" />Sylithe agent</p>
-            <p className="mt-1.5 text-[11.5px] text-mute">Answers from the model's facts and today's live data. Ocean conditions only; official cyclone advisories come from IMD.</p>
+            <p className="mt-1.5 text-[11.5px] text-mute">Ask anything. Answers about the model and today's ocean use its exact numbers. Up to 20 questions an hour.</p>
           </div>
           <button onClick={() => view.set({ copilot: false })} className="text-[13px] text-mute hover:text-ink">Close</button>
         </header>
