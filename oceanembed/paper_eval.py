@@ -127,9 +127,44 @@ def _training_curves(root: str) -> pd.DataFrame:
     return pd.concat(rows, ignore_index=True) if rows else pd.DataFrame()
 
 
-def run(data: str, root: str, out: str, window: int = C.TrainConfig.window, log=print):
+def _on_disk(ds: xr.Dataset, work: str, name: str) -> xr.Dataset:
+    """Write a year of 3D fields to local disk and reopen lazily: scoring reads one day at a time, so memory
+    stays at one method's day instead of every method's year (the RunPod evaluation was OOM-killed)."""
+    path = os.path.join(work, name.replace(" ", "_").replace("/", "_") + ".nc")
+    if not os.path.exists(path):
+        ds.to_netcdf(path + ".part"); os.replace(path + ".part", path)
+    del ds
+    return xr.open_dataset(path, chunks={"time": 1})
+
+
+def significance(m: pd.DataFrame, ours: str, others: list[str], n_boot: int = 2000, seed: int = 0) -> pd.DataFrame:
+    """Paired bootstrap over Argo *profiles* (all depths of a profile resampled together): distribution of
+    RMSE(other) − RMSE(ours) on the same points. p = share of resamples where ours is not better."""
+    rng = np.random.default_rng(seed)
+    obs = np.stack([m[f"T{d}"].values for d in C.DEPTHS], 1)
+    def sq(name):
+        return (np.stack([m[f"{name}_T{d}"].values for d in C.DEPTHS], 1) - obs) ** 2
+    e_o = sq(ours); rows = []
+    for name in others:
+        e_x = sq(name)
+        ok = np.isfinite(e_o) & np.isfinite(e_x)
+        a = np.where(ok, e_o, 0.0); b = np.where(ok, e_x, 0.0); n = ok.sum(1)
+        keep = n > 0; a, b, n = a[keep].sum(1), b[keep].sum(1), n[keep]
+        idx = rng.integers(0, len(n), (n_boot, len(n)))
+        d = np.sqrt(b[idx].sum(1) / n[idx].sum(1)) - np.sqrt(a[idx].sum(1) / n[idx].sum(1))
+        full = np.sqrt(b.sum() / n.sum()) - np.sqrt(a.sum() / n.sum())
+        rows.append({"vs": name, "profiles": int(len(n)), "rmse_ours": float(np.sqrt(a.sum() / n.sum())),
+                     "rmse_other": float(np.sqrt(b.sum() / n.sum())), "improvement": float(full),
+                     "ci95_low": float(np.percentile(d, 2.5)), "ci95_high": float(np.percentile(d, 97.5)),
+                     "p_not_better": float((d <= 0).mean())})
+    return pd.DataFrame(rows)
+
+
+def run(data: str, root: str, out: str, window: int = C.TrainConfig.window, ensemble_nc: str | None = None,
+        log=print):
     t0 = time.time()
     os.makedirs(out, exist_ok=True)
+    work = os.path.join(out, "_work"); os.makedirs(work, exist_ok=True)
     S = D.load_stats(os.path.join(root, "stats_v2.npz"))
     inputs = os.path.join(data, "inputs.zarr")
     G = xr.open_zarr(os.path.join(data, "target.zarr")).thetao.sel(time=slice(*C.TEST))
@@ -142,19 +177,28 @@ def run(data: str, root: str, out: str, window: int = C.TrainConfig.window, log=
     if seeds:
         members = [TR.load_model(p)[0] for p in seeds]
         log(f"Sylithe Ocean Model ensemble ({len(members)} members)")
-        methods[f"Sylithe Ocean Model ({len(members)}-model ensemble)"] = ("ours", I.reconstruct(members, inputs, S, *C.TEST, window=window))
+        name = f"Sylithe Ocean Model ({len(members)}-model ensemble)"
+        if ensemble_nc and os.path.exists(ensemble_nc):            # reuse the reconstruction made on the GPU run
+            log(f"  using saved ensemble reconstruction {ensemble_nc}")
+            ens = xr.open_dataset(ensemble_nc, chunks={"time": 1}).sel(time=slice(*C.TEST))
+        else:
+            ens = _on_disk(I.reconstruct(members, inputs, S, *C.TEST, window=window), work, "ensemble")
+        methods[name] = ("ours", ens)
         if len(members) > 1:
-            methods["Sylithe Ocean Model (single model)"] = ("ours", I.reconstruct(members[0], inputs, S, *C.TEST, window=window))
+            methods["Sylithe Ocean Model (single model)"] = ("ours", _on_disk(
+                I.reconstruct(members[0], inputs, S, *C.TEST, window=window), work, "single"))
     p3 = os.path.join(root, "checkpoints", f"attn_unetpp3d_w{window}", "glorys_best.pt")
     if os.path.exists(p3):
         log("published method")
         net3, cfg3 = TR.load_model(p3)
-        methods["Attention 3D U-Net++ (Wang et al. 2026)"] = ("published method (retrained here)",
-                                                             I.reconstruct(net3, inputs, S, *C.TEST, window=cfg3.window))
+        methods["Attention 3D U-Net++ (Wang et al. 2026)"] = ("published method (retrained here)", _on_disk(
+            I.reconstruct(net3, inputs, S, *C.TEST, window=cfg3.window), work, "attn_unetpp3d"))
     ridge = os.path.join(root, "baselines", "ridge.npz")
     if os.path.exists(ridge):
-        methods["Ridge regression"] = ("baseline", I.reconstruct_baseline(B.Ridge(S).load(ridge), inputs, S, *C.TEST, window=window))
-    methods["Climatology"] = ("baseline", I.reconstruct_baseline(B.Climatology(S), inputs, S, *C.TEST, window=window))
+        methods["Ridge regression"] = ("baseline", _on_disk(
+            I.reconstruct_baseline(B.Ridge(S).load(ridge), inputs, S, *C.TEST, window=window), work, "ridge"))
+    methods["Climatology"] = ("baseline", _on_disk(
+        I.reconstruct_baseline(B.Climatology(S), inputs, S, *C.TEST, window=window), work, "climatology"))
     hy = os.path.join(data, "hycom.zarr")
     if os.path.exists(hy):
         methods["HYCOM (independent model)"] = ("reference product",
@@ -197,6 +241,11 @@ def run(data: str, root: str, out: str, window: int = C.TrainConfig.window, log=
         m.columns = [c if not c.startswith("m") or "_T" not in c else
                      list(fields)[int(c[1:c.index("_")])] + c[c.index("_"):] for c in m.columns]
         m.to_parquet(os.path.join(out, "argo_matchups.parquet"))
+        if ours_name:
+            others = [n for n in list(methods) + ["GLORYS12 reanalysis"] if n != ours_name and f"{n}_T0" in m]
+            sig = significance(m, ours_name, others)
+            sig.to_csv(os.path.join(out, "significance.csv"), index=False)
+            log("significance vs Argo:\n" + sig.round(4).to_string(index=False))
     if ours_name is not None and "cov_glorys" in locals():
         cov_rows += [{"k": k, "reference": "glorys", "observed": float(v)} for k, v in zip(K_SIGMA, cov_glorys)]
     from math import erf, sqrt
@@ -229,8 +278,8 @@ def run(data: str, root: str, out: str, window: int = C.TrainConfig.window, log=
         bob = M.region_mask("BoB")
         case = {"days": np.array([str(d.date()) for d in days])}
         for tag, arr in [("truth", G), ("ours", methods[ours_name][1].thetao)]:
-            tc = np.stack([M.tchp(arr.sel(time=d).values) for d in days])
-            d26 = np.stack([M.isotherm_depth(arr.sel(time=d).values, 26.0) for d in days])
+            tc = np.stack([M.tchp_fast(arr.sel(time=d).values) for d in days])
+            d26 = np.stack([M.isotherm_depth_fast(arr.sel(time=d).values, 26.0) for d in days])
             case[f"{tag}_tchp"] = tc.astype("f4"); case[f"{tag}_d26"] = d26.astype("f4")
             case[f"{tag}_tchp_bob_mean"] = np.array([np.nanmean(t[bob]) for t in tc])
         np.savez_compressed(os.path.join(out, "tchp_case.npz"), **case)
@@ -248,9 +297,10 @@ def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--data", required=True); p.add_argument("--root", required=True); p.add_argument("--out", required=True)
     p.add_argument("--window", type=int, default=C.TrainConfig.window)
+    p.add_argument("--ensemble-nc", default=None, help="reuse a saved ensemble reconstruction (NetCDF) instead of recomputing")
     p.add_argument("--figures", action="store_true", help="also draw all figures (figures.py)")
     a = p.parse_args(argv)
-    run(a.data, a.root, a.out, a.window)
+    run(a.data, a.root, a.out, a.window, a.ensemble_nc)
     if a.figures:
         from . import figures, figures_paper
         figures.draw_all(a.out)

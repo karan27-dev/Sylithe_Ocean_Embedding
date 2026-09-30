@@ -114,7 +114,9 @@ def _runs(days: list[pd.Timestamp], max_len: int = 31):
 
 
 def run(data: str, root: str, start: str, end: str, force: bool = False, batch: int = 8,
-        window: int = C.TrainConfig.window, log=print):
+        window: int = C.TrainConfig.window, from_nc: str | None = None, log=print):
+    """from_nc: a reconstruction already made by this same ensemble (e.g. OceanEmbed_NIO_T_2023.nc from the
+    training run); its days are cached instead of being recomputed, with identical results."""
     t0 = time.time()
     S = D.load_stats(os.path.join(root, "stats_v2.npz"))
     ck = TR.seed_checkpoints(os.path.join(root, "checkpoints", f"oceanembed_w{window}"))
@@ -141,7 +143,12 @@ def run(data: str, root: str, start: str, end: str, force: bool = False, batch: 
     model_tag = [os.path.relpath(p, root) for p in ck]
     for chunk in _runs(todo):
         a, b = str(chunk[0].date()), str(chunk[-1].date())
-        rec = I.reconstruct(members, inputs_path, S, a, b, window=window, batch=batch)
+        if from_nc:
+            rec = xr.open_dataset(from_nc).sel(time=slice(a, b)).load()
+            if rec.sizes["time"] != len(chunk):
+                raise SystemExit(f"{from_nc} does not cover {a} → {b}")
+        else:
+            rec = I.reconstruct(members, inputs_path, S, a, b, window=window, batch=batch)
         for name, var in [("thetao", "thetao"), ("sigma", "thetao_sigma")]:
             ingest.write_block(store.zarr, rec[var].rename(name), name)
         raw = inp.sel(time=slice(a, b))[C.INPUT_VARS].load()
@@ -197,12 +204,13 @@ def main(argv=None):
     r.add_argument("--start", default=C.TEST[0]); r.add_argument("--end", default=C.TEST[1])
     r.add_argument("--force", action="store_true", help="recompute days that are already cached")
     r.add_argument("--batch", type=int, default=8)
+    r.add_argument("--from-nc", default=None, help="take predictions from a saved ensemble reconstruction")
     r.add_argument("--window", type=int, default=C.TrainConfig.window, help="checkpoint folder oceanembed_w<window>")
     e = sub.choices["export"]
     e.add_argument("--out", required=True); e.add_argument("--maps-last", type=int, default=31)
     a = p.parse_args(argv)
     if a.cmd == "run":
-        run(a.data, a.root, a.start, a.end, a.force, a.batch, a.window)
+        run(a.data, a.root, a.start, a.end, a.force, a.batch, a.window, a.from_nc)
     else:
         export(a.data, a.root, a.out, a.maps_last)
 
