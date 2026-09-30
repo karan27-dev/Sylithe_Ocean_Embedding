@@ -112,6 +112,23 @@ def _load_inputs(inputs_path, stats) -> np.ndarray:
     return _INPUT_CACHE[key]
 
 
+_TARGET_CACHE: dict = {}
+
+
+def _load_target(target_path) -> tuple[np.ndarray, float, float, int]:
+    """Whole target record in RAM in its stored int16 encoding (~5 GB for 2005–2023), read once in the main
+    process. DataLoader workers then only index memory. Reading the Zarr store inside forked workers deadlocks:
+    zarr's background I/O thread does not survive fork (the first RunPod run hung for hours at epoch 0)."""
+    if target_path not in _TARGET_CACHE:
+        _TARGET_CACHE.clear()
+        da = xr.open_zarr(target_path, mask_and_scale=False)["thetao"]
+        a = da.attrs | da.encoding
+        raw = da.values
+        _TARGET_CACHE[target_path] = (raw, float(a.get("scale_factor", 1.0)), float(a.get("add_offset", 0.0)),
+                                      a.get("_FillValue", None))
+    return _TARGET_CACHE[target_path]
+
+
 class SurfaceWindows(Dataset):
     """Items: x (2V,T,H,W) = [raw, anomaly], missing (2V,T,H,W), static (5,H,W), y (15,H,W), m (15,H,W),
     plus physical helpers (clim, sst at t). All spatial arrays padded to (PAD_H, PAD_W)."""
@@ -123,7 +140,7 @@ class SurfaceWindows(Dataset):
         ds = xr.open_zarr(inputs_path)
         self.time = pd.DatetimeIndex(ds.time.values)
         self.inp = _load_inputs(inputs_path, stats)
-        self.T = xr.open_zarr(target_path)["thetao"] if need_target else None
+        self.T = _load_target(target_path) if need_target else None
         # searchsorted (not get_loc) so the same class works on the monthly stores of the Argo stage
         t0 = int(self.time.searchsorted(pd.Timestamp(period[0])))
         t1 = int(self.time.searchsorted(pd.Timestamp(period[1]), side="right")) - 1
@@ -174,7 +191,11 @@ class SurfaceWindows(Dataset):
             item["surface_mask"] = _pad((pm[None] & (self.ocean > 0)).repeat(N_VARS, 0).astype("f4"))
         if self.T is not None:
             clim = self.S["clim"][doy - 1]
-            Tt = self.T.isel(time=t).values.astype("f4")
+            raw, scale, offset, fill = self.T
+            enc = raw[t]
+            Tt = enc.astype("f4") * np.float32(scale) + np.float32(offset) if raw.dtype.kind == "i" else enc.astype("f4")
+            if fill is not None:
+                Tt[enc == fill] = np.nan
             y = (Tt - clim) / self.S["depth_std"][:, None, None]
             m = np.isfinite(y)
             item |= {"y": _pad(np.nan_to_num(y)), "m": _pad(m.astype("f4")),
