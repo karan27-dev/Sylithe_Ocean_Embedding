@@ -1,13 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
-import { MapContainer, Pane, Polygon, TileLayer, CircleMarker, Rectangle, useMap, useMapEvents } from 'react-leaflet'
+import { MapContainer, Pane, TileLayer, CircleMarker, Rectangle, useMap, useMapEvents } from 'react-leaflet'
 import { cellAt, gridBounds, REGIONS } from '../../lib/ocean'
 
 const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas'
 const DOMAIN = [[5, 45], [30, 105]]
-// Everything outside the study domain is faded, so an empty ocean reads as "out of scope", not "missing".
-const WORLD = [[-85, -180], [-85, 180], [85, 180], [85, -180]]
-const HOLE = [[5, 45], [30, 45], [30, 105], [5, 105]]
 
 /** Image overlay that cross-fades to each new field instead of blinking: depth and date changes read as motion. */
 function FadeOverlay({ url, bounds, opacity = 1 }) {
@@ -107,11 +104,6 @@ export default function OceanMap({ g, url, grid, probe, onPick, onHover, points,
         ) : (
           <TileLayer key="lightl" url={`${ESRI}/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}`} maxNativeZoom={16} opacity={0.65} />
         )}
-      </Pane>
-      <Pane name="domain" style={{ zIndex: 440, pointerEvents: 'none' }}>
-        <Polygon positions={[WORLD, HOLE]} interactive={false}
-          pathOptions={{ stroke: false, fillColor: sat ? '#0B1418' : '#F5F3EE', fillOpacity: sat ? 0.45 : 0.62 }} />
-        <Rectangle bounds={DOMAIN} interactive={false} pathOptions={{ color: sat ? '#F5F3EE' : '#15181A', weight: 0.8, opacity: 0.6, fill: false }} />
       </Pane>
       {showRegion && region !== 'NIO' && (
         <Rectangle bounds={REGIONS[region].bounds} interactive={false}
