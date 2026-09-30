@@ -13,6 +13,7 @@ import xarray as xr
 from . import config as C
 from .dataset import SurfaceWindows, unpad
 from .metrics import isotherm_depth, mld, tchp
+from . import train as TR
 from .train import DEV
 
 
@@ -42,7 +43,8 @@ def reconstruct(models, inputs_path, stats, start, end, window, batch=4):
     std = torch.tensor(stats["depth_std"], device=DEV).view(1, -1, 1, 1)
     Ts, Ss, times = [], [], []
     for b in torch.utils.data.DataLoader(ds, batch):
-        outs = [m(b["x"].to(DEV), b["missing"].to(DEV), b["static"].to(DEV)) for m in models]
+        b = TR._to(b)
+        outs = [m(b["x"], b["missing"], b["static"]) for m in models]
         mu = torch.stack([o[0] for o in outs])                                  # (M, B, 15, H, W), normalised
         var = torch.stack([torch.exp(o[1]) for o in outs]).mean(0) + mu.var(0, unbiased=False)
         doy = [int(ds.doy[int(t)]) - 1 for t in b["t"]]

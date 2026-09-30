@@ -123,7 +123,9 @@ def _load_target(target_path) -> tuple[np.ndarray, float, float, int]:
         _TARGET_CACHE.clear()
         da = xr.open_zarr(target_path, mask_and_scale=False)["thetao"]
         a = da.attrs | da.encoding
-        raw = da.values
+        raw = np.empty(da.shape, dtype=da.dtype)             # fill in slices: no second full-size copy
+        for i in range(0, da.sizes["time"], 256):
+            raw[i:i + 256] = da.isel(time=slice(i, i + 256)).values
         _TARGET_CACHE[target_path] = (raw, float(a.get("scale_factor", 1.0)), float(a.get("add_offset", 0.0)),
                                       a.get("_FillValue", None))
     return _TARGET_CACHE[target_path]
@@ -178,13 +180,15 @@ class SurfaceWindows(Dataset):
             pm = np.random.rand(ph, pw) < self.patch_mask
             pm = np.kron(pm, np.ones((16, 16), bool))[: len(C.LATS), : len(C.LONS)]
             miss[:, -3:, pm] = True
-        x = np.where(miss, 0.0, x).astype("f4")
+        x = np.where(miss, 0.0, x).astype("f2")
+        # x as float16 and the missing mask as uint8 (cast to float32 on the GPU): a sample is ~27 MB instead of
+        # ~56 MB, which is what kept 8 prefetching workers inside a 50 GB pod
         item = {
-            "x": _pad(x), "missing": _pad(miss.astype("f4"), 1.0),
+            "x": _pad(x), "missing": _pad(miss.astype("u1"), 1),
             "static": _pad(static_channels(self.ocean, doy)),
             "t": np.int64(t),
         }
-        sst_phys = x[0, -1] * self.S["sst_std"] + self.S["sst_mean"]
+        sst_phys = x[0, -1].astype("f4") * self.S["sst_std"] + self.S["sst_mean"]
         item["sst"] = _pad(np.where(miss[0, -1], np.nan, sst_phys).astype("f4"), np.nan)
         if target_surface is not None:
             item["surface"] = _pad(target_surface)

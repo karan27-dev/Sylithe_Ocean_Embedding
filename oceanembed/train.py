@@ -28,7 +28,15 @@ torch.backends.cudnn.benchmark = True        # fixed input shapes: let cuDNN pic
 
 
 def _to(batch):
-    return {k: (v.to(DEV, non_blocking=True) if torch.is_tensor(v) else v) for k, v in batch.items()}
+    """Move a batch to the device; compact inputs (float16 x, uint8 masks) become float32 on the device."""
+    out = {}
+    for k, v in batch.items():
+        if torch.is_tensor(v):
+            v = v.to(DEV, non_blocking=True)
+            if v.dtype in (torch.float16, torch.uint8):
+                v = v.float()
+        out[k] = v
+    return out
 
 
 def _physical(mean, b, depth_std):
