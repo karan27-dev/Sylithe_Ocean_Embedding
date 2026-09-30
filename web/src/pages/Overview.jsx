@@ -65,7 +65,7 @@ export default function Overview() {
           <p className="label">North Indian Ocean · 5–30°N, 45–105°E · 0.25° · daily</p>
           <h1 className="display mt-5 text-[40px] leading-[1.04] sm:text-[54px]">Reconstructing the ocean beneath the surface.</h1>
           <p className="mt-6 max-w-[46ch] text-[16px] leading-relaxed text-ink2">
-            Satellites see the ocean's skin every day. OceanEmbed learns what that surface implies about the water below and
+            Satellites see the ocean's skin every day. Sylithe Ocean Model learns what that surface implies about the water below and
             reconstructs temperature at fifteen depths, from the surface to 1000 m, with an honest uncertainty on every value.
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-5">

@@ -114,12 +114,12 @@ class Run:
         seeds = TR.seed_checkpoints(self.ck)
         members = [TR.load_model(p)[0] for p in seeds]
         if members:
-            self.log(f"scoring OceanEmbed ({len(members)} members)")
+            self.log(f"scoring Sylithe Ocean Model ({len(members)} members)")
             rec = I.reconstruct(members, self.inputs, self.S, *C.TEST, window=self.cfg.window)
             rec.to_netcdf(os.path.join(self.root, "OceanEmbed_NIO_T_2023.nc"))
-            lb.add(f"OceanEmbed ({len(members)}-model ensemble)", "ours", rec.thetao)
+            lb.add(f"Sylithe Ocean Model ({len(members)}-model ensemble)", "ours", rec.thetao)
             if len(members) > 1:
-                lb.add("OceanEmbed (single model)", "ours",
+                lb.add("Sylithe Ocean Model (single model)", "ours",
                        I.reconstruct(members[0], self.inputs, self.S, *C.TEST, window=self.cfg.window).thetao)
         p3 = os.path.join(self.ck3, "glorys_best.pt")
         if os.path.exists(p3):

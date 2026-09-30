@@ -3,7 +3,7 @@ import { DEPTHS, fmt } from '../../lib/ocean'
 import { linePath, linear, sqrtDepth, ticks, useWidth } from './scale'
 
 export const PRODUCT_STYLE = {
-  ours: { color: 'rgb(var(--sea))', width: 2, label: 'OceanEmbed' },
+  ours: { color: 'rgb(var(--sea))', width: 2, label: 'Sylithe Ocean Model' },
   glorys: { color: 'rgb(var(--ink))', width: 1.4, dash: '4 3', label: 'GLORYS12' },
   hycom: { color: '#8A6F4E', width: 1.5, label: 'HYCOM' },
 }

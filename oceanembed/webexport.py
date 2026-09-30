@@ -240,7 +240,7 @@ def export_model(out_dir, rec, glorys, inputs_path, stats, models, window, days,
     import shutil
     import xarray as xr
     days = pd.DatetimeIndex(days)
-    ex = WebExport(out_dir, "model", "OceanEmbed reconstruction",
+    ex = WebExport(out_dir, "model", "Sylithe Ocean Model reconstruction",
                    f"{len(models)}-model ensemble from surface satellite observations only; test year never seen in training.")
     ocean = np.asarray(stats["ocean"]) > 0
     inp = xr.open_zarr(inputs_path)
@@ -281,6 +281,6 @@ def export_model(out_dir, rec, glorys, inputs_path, stats, models, window, days,
         shutil.copy(leaderboard_json, os.path.join(out_dir, "leaderboard.json"))
         ex.extra["leaderboard"] = "leaderboard.json"
 
-    labels = {"ours": ("OceanEmbed", "ours"), "glorys": ("GLORYS12", "reference"), "hycom": ("HYCOM GOFS 3.1", "reference")}
+    labels = {"ours": ("Sylithe Ocean Model", "ours"), "glorys": ("GLORYS12", "reference"), "hycom": ("HYCOM GOFS 3.1", "reference")}
     return ex.finish(products={p: {"label": labels[p][0], "kind": labels[p][1]} for p in products},
                      inputs=list(C.INPUT_VARS), primary="ours", argo_match="same day, nearest 0.25° cell")

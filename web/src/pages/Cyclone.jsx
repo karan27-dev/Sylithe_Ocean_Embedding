@@ -50,7 +50,7 @@ function hotspots(m, day, k = 6) {
 }
 
 function bulletin(m, day, st, hs) {
-  const src = m.source.kind === 'model' ? 'the OceanEmbed reconstruction' : `${m.source.label} (reference field)`
+  const src = m.source.kind === 'model' ? 'the Sylithe Ocean Model reconstruction' : `${m.source.label} (reference field)`
   const b = st.BoB, a = st.AS
   const pct = (v) => `${Math.round(v * 100)} %`
   const lines = [

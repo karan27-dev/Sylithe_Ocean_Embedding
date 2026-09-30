@@ -1,6 +1,6 @@
 import { SectionHead } from '../components/ui'
 
-// Architecture as implemented in oceanembed/model.py (OceanEmbedNet): 3-D stem + temporal attention, a CBAM encoder
+// Architecture as implemented in oceanembed/model.py (Sylithe Ocean ModelNet): 3-D stem + temporal attention, a CBAM encoder
 // whose deepest level gives the embedding, and a U-Net++ nested decoder with deep supervision.
 const L = 4, DX = 92, DY = 62, X0 = 440, Y0 = 52
 const node = (i, j) => [X0 + j * DX, Y0 + i * DY]
@@ -12,7 +12,7 @@ function Diagram() {
   const W = 1000, H = 330
   const box = (x, y, w, h, props = {}) => <rect x={x - w / 2} y={y - h / 2} width={w} height={h} rx="3" {...props} />
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="block w-full min-w-[860px]" role="img" aria-label="OceanEmbedNet architecture">
+    <svg viewBox={`0 0 ${W} ${H}`} className="block w-full min-w-[860px]" role="img" aria-label="Sylithe Ocean ModelNet architecture">
       <defs>
         <marker id="ar" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto">
           <path d="M0 0L8 4L0 8z" fill="rgb(var(--mute))" />
@@ -91,7 +91,7 @@ const LOSSES = [
   ['No monotonicity penalty', 'Deliberately absent: winter temperature inversions under the Bay of Bengal barrier layer are real.'],
 ]
 const EXPERIMENTS = [
-  ['OceanEmbed ensemble vs a single model', 'what averaging seeds buys, and the ensemble spread folded into σ'],
+  ['Sylithe Ocean Model ensemble vs a single model', 'what averaging seeds buys, and the ensemble spread folded into σ'],
   ['Attention 3-D U-Net++, retrained here', 'the published method on identical data, grid, depths and test year'],
   ['Ridge regression and climatology', 'how much of the skill a simple model or the seasonal cycle alone already gives'],
   ['Real-time mode', 'SST and SLA only; the variable dropout in training is what makes this work'],
@@ -116,7 +116,7 @@ export default function Model() {
   return (
     <div className="pb-8">
       <div className="page pt-12 sm:pt-16">
-        <SectionHead as="h1" label="Model · OceanEmbedNet" title="From a surface window to a temperature column">
+        <SectionHead as="h1" label="Model · Sylithe Ocean ModelNet" title="From a surface window to a temperature column">
           The network reads fifteen days of fourteen surface channels, the seven observed variables and their day-of-year
           anomalies, and predicts, for every ocean cell, a mean and an uncertainty at fifteen depths. It predicts anomalies from a
           climatology, so the seasonal stratification comes for free and the capacity goes to eddies, Kelvin and Rossby waves and

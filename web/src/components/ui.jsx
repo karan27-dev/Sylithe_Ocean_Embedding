@@ -15,9 +15,9 @@ export function Mark({ size = 18, className = '' }) {
 
 export function Wordmark({ className = '' }) {
   return (
-    <Link to="/" className={`flex items-center gap-2 text-ink ${className}`} aria-label="OceanEmbed home">
+    <Link to="/" className={`flex items-center gap-2 text-ink ${className}`} aria-label="Sylithe Ocean Model home">
       <Mark className="text-sea" />
-      <span className="font-display text-[19px] leading-none tracking-[-0.01em]">OceanEmbed</span>
+      <span className="font-display text-[19px] leading-none tracking-[-0.01em]">Sylithe Ocean Model</span>
     </Link>
   )
 }
@@ -60,7 +60,7 @@ export function Footer() {
   return (
     <footer className="mt-24 border-t border-line">
       <div className="page flex flex-col gap-3 py-8 text-[12px] text-mute sm:flex-row sm:items-center sm:justify-between">
-        <p>OceanEmbed · Reconstructing the ocean beneath the surface.</p>
+        <p>Sylithe Ocean Model · Reconstructing the ocean beneath the surface.</p>
         <p>Colour maps: cmocean (Thyng et al., 2016). Basemap © Esri.</p>
       </div>
     </footer>

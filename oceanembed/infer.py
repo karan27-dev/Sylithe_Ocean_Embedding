@@ -28,7 +28,7 @@ def _to_dataset(T, S, times, stats, source):
         data["thetao_sigma"] = (("time", "depth", "lat", "lon"), np.where(valid, S, np.nan).astype("f4"),
                                 {"units": "degC", "long_name": "predicted 1-sigma uncertainty"})
     return xr.Dataset(data, coords=coords, attrs={
-        "title": "OceanEmbed NIO subsurface temperature reconstruction", "source": source,
+        "title": "Sylithe Ocean Model: North Indian Ocean subsurface temperature reconstruction", "source": source,
         "grid": "0.25 deg, daily", "Conventions": "CF-1.8"})
 
 
@@ -52,7 +52,7 @@ def reconstruct(models, inputs_path, stats, start, end, window, batch=4):
         Ts.append((unpad(mu.mean(0) * std) + clim).cpu().numpy())
         Ss.append(unpad(var.sqrt() * std).cpu().numpy())
         times += [ds.time[int(t)] for t in b["t"]]
-    src = f"OceanEmbed ({len(models)}-model ensemble) from surface satellite observations only"
+    src = f"Sylithe Ocean Model ({len(models)}-model ensemble) from surface satellite observations only"
     return _to_dataset(np.concatenate(Ts), np.concatenate(Ss), times, stats, src)
 
 
@@ -79,7 +79,7 @@ def export_web(ds: xr.Dataset, out_dir: str, comparison: xr.Dataset | None = Non
     for t in ds.time.values:
         day = str(pd.Timestamp(t).date())
         T = ds.thetao.sel(time=t).values
-        rec = {"date": day, "source": "OceanEmbed reconstruction", "lon0": C.LON_MIN, "lat0": C.LAT_MAX,
+        rec = {"date": day, "source": "Sylithe Ocean Model reconstruction", "lon0": C.LON_MIN, "lat0": C.LAT_MAX,
                "step": C.RES, "width": len(C.LONS), "height": len(C.LATS), "depths": C.DEPTHS,
                # rows north→south to match image rows
                "temp": [_round(x[::-1]) for x in T],

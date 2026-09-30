@@ -67,10 +67,10 @@ export default function Validation() {
           exactly the same floats, so the comparison is like for like.
         </SectionHead>
         {!model && (
-          <Pending className="mt-8" title="These numbers are for the HYCOM reference field, not yet for OceanEmbed">
+          <Pending className="mt-8" title="These numbers are for the HYCOM reference field, not yet for Sylithe Ocean Model">
             Until the reconstruction is exported, this page scores HYCOM GOFS 3.1 against {argo?.profiles?.length ?? 0} real Argo profiles
             around {m.days.map((d) => fmtDate(d.date)).join(' and ')}. Every chart below is computed, none is illustrative. Notebook 03
-            adds OceanEmbed, GLORYS12 and the held-out year 2023 to the same views.
+            adds Sylithe Ocean Model, GLORYS12 and the held-out year 2023 to the same views.
           </Pending>
         )}
 
@@ -158,7 +158,7 @@ export default function Validation() {
           </div>
         ) : (
           <Pending title="Available with the model export">
-            HYCOM and GLORYS give no per-cell uncertainty, so this check exists only for OceanEmbed. Notebook 03 writes coverage.json
+            HYCOM and GLORYS give no per-cell uncertainty, so this check exists only for Sylithe Ocean Model. Notebook 03 writes coverage.json
             from the same Argo match.
           </Pending>
         )}
@@ -221,7 +221,7 @@ export default function Validation() {
           </div>
         ) : (
           <Pending title="Written by the benchmark run">
-            oceanembed/benchmark.py builds leaderboard.json after training: OceanEmbed (ensemble and single model), the Attention 3D U-Net++
+            oceanembed/benchmark.py builds leaderboard.json after training: Sylithe Ocean Model (ensemble and single model), the Attention 3D U-Net++
             retrained here, ridge regression, climatology, GLORYS12 and HYCOM.
           </Pending>
         )}

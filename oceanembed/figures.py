@@ -39,7 +39,7 @@ plt.rcParams.update({
 
 def style(method: str) -> dict:
     m = method.lower()
-    if "oceanembed" in m:
+    if "oceanembed" in m or "sylithe" in m:
         return dict(color="#16a34a", lw=2.4, ls="--" if "single" in m else "-", zorder=5)
     if "u-net" in m:
         return dict(color="#ea580c", lw=1.8, ls="-", zorder=4)
@@ -115,7 +115,7 @@ class Figs:
         fig, ax = plt.subplots(figsize=(5.2, 3.2))
         for r in runs:
             d = t[t.run == r]
-            name = "Attention 3D U-Net++" if "attn" in r else "OceanEmbed " + r.split("/")[-2]
+            name = "Attention 3D U-Net++" if "attn" in r else "Sylithe Ocean Model " + r.split("/")[-2]
             ax.plot(d.epoch, d.val_score, label=name, **{k: v for k, v in style(name).items() if k != "zorder"})
         ax.set_xlabel("Epoch"); ax.set_ylabel("Validation RMSE vs GLORYS 2022 (°C)")
         ax.set_title("Training: validation error (EMA weights)"); ax.legend(fontsize=7)
@@ -167,7 +167,7 @@ class Figs:
         day = day or self._showcase(s)
         if not day:
             return
-        cols = [("truth", "GLORYS12 (reference)"), ("ours", "OceanEmbed"), ("err_ours", "OceanEmbed − GLORYS")]
+        cols = [("truth", "GLORYS12 (reference)"), ("ours", "Sylithe Ocean Model"), ("err_ours", "Sylithe Ocean Model − GLORYS")]
         if f"{day}|published" in s:
             cols.append(("err_pub", "Attention 3D U-Net++ − GLORYS"))
         fig, axes = plt.subplots(len(depths), len(cols), figsize=(3.1 * len(cols), 1.75 * len(depths)))
@@ -207,7 +207,7 @@ class Figs:
                 im = self._map(axes[i, j], z[f"{n}|rmse"][C.DEPTHS.index(d)], CMAP_RMSE, 0, vmax,
                                title=f"{d} m" if i == 0 else None)
                 if j == 0:
-                    axes[i, j].set_ylabel("OceanEmbed" if "OceanEmbed" in n else "Attn 3D U-Net++", fontsize=8, weight="bold")
+                    axes[i, j].set_ylabel("Sylithe Ocean Model" if "Sylithe Ocean Model" in n or "OceanEmbed" in n else "Attn 3D U-Net++", fontsize=8, weight="bold")
         fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.8, pad=0.01, label="Time-mean RMSE vs GLORYS (°C)")
         fig.suptitle(f"Where the error is: {self.meta['test'][0][:4]} mean RMSE by depth", fontsize=10)
         self.save(fig, "fig07_rmse_maps")
@@ -249,11 +249,11 @@ class Figs:
         tr, ou = s[f"{day}|truth"][zi, y, :], s[f"{day}|ours"][zi, y, :]
         lo, hi = np.nanpercentile(tr, [2, 99])
         fig, axes = plt.subplots(3, 1, figsize=(7.4, 6.2), sharex=True)
-        for ax, a, cm, vl, vh, title in [(axes[0], tr, CMAP_T, lo, hi, "GLORYS12"), (axes[1], ou, CMAP_T, lo, hi, "OceanEmbed"),
-                                         (axes[2], ou - tr, CMAP_ERR, -1.5, 1.5, "OceanEmbed − GLORYS")]:
+        for ax, a, cm, vl, vh, title in [(axes[0], tr, CMAP_T, lo, hi, "GLORYS12"), (axes[1], ou, CMAP_T, lo, hi, "Sylithe Ocean Model"),
+                                         (axes[2], ou - tr, CMAP_ERR, -1.5, 1.5, "Sylithe Ocean Model − GLORYS")]:
             ax.set_facecolor(LAND)
             im = ax.pcolormesh(C.LONS, Z, a, cmap=cm, vmin=vl, vmax=vh, shading="nearest")
-            if title != "OceanEmbed − GLORYS":
+            if title != "Sylithe Ocean Model − GLORYS":
                 for iso, ls in [(26, "--"), (20, "-")]:
                     zc = isotherm_depth(np.concatenate([a, np.full((len(C.DEPTHS) - len(zi), a.shape[1]), np.nan)])[:, None, :], iso)[0]
                     ax.plot(C.LONS, zc, color="black", lw=0.9, ls=ls)
@@ -294,7 +294,7 @@ class Figs:
         vmax = np.nanpercentile(z["truth_tchp"], 99)
         for j, d in enumerate(picks):
             i = days.index(d)
-            for r, (tag, lab) in enumerate([("truth", "GLORYS12"), ("ours", "OceanEmbed")]):
+            for r, (tag, lab) in enumerate([("truth", "GLORYS12"), ("ours", "Sylithe Ocean Model")]):
                 ax = fig.add_subplot(gs[r, j])
                 im = self._map(ax, z[f"{tag}_tchp"][i], CMAP_HEAT, 0, vmax, title=f"{lab} · {d}")
                 ax.set_xlim(78, 100); ax.set_ylim(5, 24)
@@ -302,7 +302,7 @@ class Figs:
         ax = fig.add_subplot(gs[:, -1])
         dd = pd.to_datetime(days)
         ax.plot(dd, z["truth_tchp_bob_mean"], label="GLORYS12", **{k: v for k, v in style("glorys").items() if k != "zorder"})
-        ax.plot(dd, z["ours_tchp_bob_mean"], label="OceanEmbed", **{k: v for k, v in style("oceanembed").items() if k != "zorder"})
+        ax.plot(dd, z["ours_tchp_bob_mean"], label="Sylithe Ocean Model", **{k: v for k, v in style("oceanembed").items() if k != "zorder"})
         if dd[0] <= pd.Timestamp("2023-05-11") and dd[-1] >= pd.Timestamp("2023-05-14"):
             ax.axvspan(pd.Timestamp("2023-05-11"), pd.Timestamp("2023-05-14"), color="#fde68a", alpha=0.6, lw=0, label="Mocha active")
         ax.set_ylabel("Bay of Bengal mean TCHP (kJ cm⁻²)"); ax.legend(fontsize=7); ax.tick_params(axis="x", rotation=45)

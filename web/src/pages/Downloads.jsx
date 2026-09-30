@@ -37,7 +37,7 @@ export default function Downloads() {
       </div>
 
       <section className="page mt-16">
-        <p className="label">NetCDF product · OceanEmbed_NIO_T_&lt;year&gt;.nc</p>
+        <p className="label">NetCDF product · Sylithe Ocean Model_NIO_T_&lt;year&gt;.nc</p>
         <div className="mt-4 overflow-x-auto">
           <table className="w-full min-w-[640px] text-[13px]">
             <thead><tr className="border-b border-line text-left">{['Variable', 'Dimensions', 'Units', 'Meaning'].map((h) => <th key={h} className="label pb-2 pr-6 font-normal">{h}</th>)}</tr></thead>

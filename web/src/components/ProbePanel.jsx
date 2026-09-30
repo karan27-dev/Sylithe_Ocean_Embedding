@@ -54,7 +54,7 @@ export default function ProbePanel({ cell, day, onClose }) {
     const head = ['depth_m', 'temperature_degC', ...(day.sigma ? ['sigma_degC'] : []), ...(day.ref ? ['glorys_degC'] : [])]
     const rows = DEPTHS.map((z, k) => [z, col[k], ...(day.sigma ? [day.sigma[k * m.N + cell.i]] : []), ...(day.ref ? [day.ref[k * m.N + cell.i]] : [])]
       .map((v) => (Number.isFinite(v) ? +v.toFixed(3) : '')).join(','))
-    const blob = new Blob([`# OceanEmbed profile ${day.date} ${cell.lat.toFixed(2)}N ${cell.lon.toFixed(2)}E · ${m.source.label}\n${head.join(',')}\n${rows.join('\n')}\n`], { type: 'text/csv' })
+    const blob = new Blob([`# Sylithe Ocean Model profile ${day.date} ${cell.lat.toFixed(2)}N ${cell.lon.toFixed(2)}E · ${m.source.label}\n${head.join(',')}\n${rows.join('\n')}\n`], { type: 'text/csv' })
     const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: `oceanembed_${day.date}_${cell.lat.toFixed(2)}N_${cell.lon.toFixed(2)}E.csv` })
     a.click(); URL.revokeObjectURL(a.href)
   }
@@ -99,7 +99,7 @@ export default function ProbePanel({ cell, day, onClose }) {
                 <button onClick={csv} className="text-[12px] text-mute hover:text-ink">CSV</button>
               </div>
               <ProfileChart
-                main={{ label: m.source.kind === 'model' ? 'OceanEmbed' : fmtDate(day.date), values: col, sigma: day.sigma ? column(m, day.sigma, cell.i) : null }}
+                main={{ label: m.source.kind === 'model' ? 'Sylithe Ocean Model' : fmtDate(day.date), values: col, sigma: day.sigma ? column(m, day.sigma, cell.i) : null }}
                 others={others}
                 points={float ? [{ label: `Argo ${float.platform}`, values: float.obs }] : []}
                 mld={ml} />

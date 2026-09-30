@@ -173,7 +173,7 @@ def export(data: str, root: str, out: str, maps_last: int = 31, log=print):
     inp = xr.open_zarr(os.path.join(data, "inputs.zarr"))
     S = D.load_stats(os.path.join(root, "stats_v2.npz"))
     ocean = S["ocean"] > 0
-    W = WebExport(out, "model", "OceanEmbed daily forecast",
+    W = WebExport(out, "model", "Sylithe Ocean Model daily forecast",
                   "Ensemble reconstruction from that day's satellite inputs, computed once by the daily pipeline "
                   "and served from its cache.")
     for day in days[-maps_last:]:
