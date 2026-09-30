@@ -9,9 +9,13 @@ const once = (key, fn) => {
   return cache.get(key)
 }
 
+// Live files (raw.githubusercontent.com) are cached for 5 minutes by GitHub and by the browser; a key that changes
+// every 5 minutes makes each visit read the newest run while repeated loads within a session stay cached.
+const fresh = (url) => (/^https?:/.test(url) ? `${url}${url.includes('?') ? '&' : '?'}v=${Math.floor(Date.now() / 300000)}` : url)
+
 export const loadManifest = (base = BASE) =>
   once(`manifest:${base}`, async () => {
-    const r = await fetch(`${base}/manifest.json`)
+    const r = await fetch(fresh(`${base}/manifest.json`))
     if (!r.ok) throw new Error(`manifest.json: HTTP ${r.status}`)
     const m = await r.json()
     m.N = m.grid.width * m.grid.height
@@ -24,7 +28,7 @@ export const loadManifest = (base = BASE) =>
 /** Optional side files (argo.json, skill_depth.json, …): resolve to null when absent. */
 export const loadJSON = (name, base = BASE) =>
   once(`json:${base}/${name}`, async () => {
-    const r = await fetch(`${base}/${name}`)
+    const r = await fetch(fresh(`${base}/${name}`))
     if (!r.ok) return null
     const t = await r.text()
     try { return JSON.parse(t) } catch { return null }     // dev server answers index.html for missing files
@@ -34,7 +38,7 @@ export const loadLayer = (m, date, name) =>
   once(`${m.base}/${date}/${name}`, async () => {
     const spec = m.layers[name]
     if (!spec) throw new Error(`layer ${name} is not in this export`)
-    const r = await fetch(`${m.base}/days/${date}/${name}.bin`)
+    const r = await fetch(fresh(`${m.base}/days/${date}/${name}.bin`))
     if (!r.ok) throw new Error(`${date}/${name}: HTTP ${r.status}`)
     const q = new Int16Array(await r.arrayBuffer())
     const out = new Float32Array(q.length), s = spec.scale, o = spec.offset, nd = m.nodata
