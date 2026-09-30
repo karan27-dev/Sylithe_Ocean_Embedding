@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useData } from '../App'
-import { loadDay, loadJSON } from '../lib/data'
+import { loadDay, loadJSON, loadManifest } from '../lib/data'
+import { features, peaks, regionSummary } from '../lib/cyclone'
 import { useView } from '../lib/store'
 import { DEPTHS, LAYERS, cellAt, column, fmt, fmtDate, fmtLat, fmtLon, isothermDepth, mld, tchp } from '../lib/ocean'
 
@@ -73,6 +74,59 @@ const describe = (a) => ({
   region: () => `region ${a.id}`, date: () => fmtDate(a.id), probe: () => `probe ${fmtLat(a.lat)} ${fmtLon(a.lon)}`, page: () => `open ${a.to}`,
 }[a.type]())
 
+/** Today's cyclone numbers straight from the newest live prediction (used when bulletin.json is not published yet). */
+async function liveCyclone() {
+  const m = await loadManifest(LIVE), date = m.days.at(-1).date, day = await loadDay(m, date)
+  const f = features(m, day)
+  return { date, hs: peaks(m, f.ocpi, { k: 5, sep: 4, min: 0.5 }), sum: regionSummary(m, day) }
+}
+
+const pct = (v) => `${Math.round((v ?? 0) * 100)} %`
+const f2 = (v, d = 2) => (Number.isFinite(v) ? v.toFixed(d) : '—')
+
+/** Deterministic answers to the common questions, from the same live context the language model would get. */
+async function localAnswer(q, ctx) {
+  const t = q.toLowerCase()
+  const board = ctx.leaderboard_2023 ?? []
+  const row = (re) => board.find((r) => re.test(r.method))
+  if (/cyclone|ocpi|hotspot|potential|storm|tchp|heat/.test(t)) {
+    const c = await liveCyclone()
+    const hs = c.hs.map((h, i) => `${i + 1}. ${fmtLat(h.lat)} ${fmtLon(h.lon)} — OCPI ${f2(h.v)}`).join('\n')
+    return `Newest prediction (${fmtDate(c.date)}):\n${hs || 'No cell reaches High (OCPI ≥ 0.5).'}\n\nShare of ocean at High or above: Bay of Bengal ${pct(c.sum.BoB.share_high)}, Arabian Sea ${pct(c.sum.AS.share_high)} `
+      + `(mean OCPI ${f2(c.sum.BoB.mean)} and ${f2(c.sum.AS.mean)}). Mean cyclone heat potential: Bay of Bengal ${f2(c.sum.BoB.tchp_mean, 0)}, Arabian Sea ${f2(c.sum.AS.tchp_mean, 0)} kJ cm⁻².\n`
+      + 'This is ocean support only, not a cyclone forecast — see Cyclone watch, and IMD for official warnings.'
+  }
+  if (/beat|compar|u-?net|published|better|benchmark|leaderboard|rank|hycom|ridge/.test(t)) {
+    const e = row(/ensemble/), u = row(/U-Net/), r = row(/Ridge/), h = row(/HYCOM/), c = row(/Climatology/)
+    return `2023 test year, RMSE against 9,469 Argo measurements: Sylithe ensemble ${f2(e?.rmse_vs_argo, 3)} °C, published Attention 3D U-Net++ ${f2(u?.rmse_vs_argo, 3)}, `
+      + `ridge ${f2(r?.rmse_vs_argo, 3)}, HYCOM ${f2(h?.rmse_vs_argo, 3)}, climatology ${f2(c?.rmse_vs_argo, 3)} °C. Against GLORYS12: ${f2(e?.rmse_vs_glorys, 3)} vs ${f2(u?.rmse_vs_glorys, 3)} °C for the U-Net++.\n`
+      + 'The gain over the published model is statistically significant below 200 m (p = 0.003) and in the Bay of Bengal (p = 0.007); over the whole column it is small (p = 0.12). Details: Validation and Research pages.'
+  }
+  if (/depth|100 ?m|thermocline|why.*(error|worse|largest)|where.*error/.test(t)) {
+    return 'Errors peak in the thermocline, 75–150 m: RMSE against Argo is 0.35 °C at the surface, about 1.25 °C at 100–125 m and 0.22 °C at 1000 m. '
+      + 'There temperature falls fastest with depth, so a few metres of vertical displacement (eddies, Kelvin and Rossby waves) becomes a large temperature error, and the surface signal is weakest. '
+      + 'The model\'s own uncertainty σ is also largest there. Below 300 m it matches or beats GLORYS12.'
+  }
+  if (/accura|rmse|error|argo|skill|how good|reliable|trust/.test(t)) {
+    const s = ctx.live_argo_check
+    return 'On 2023 (never seen in training): 0.662 °C RMSE against GLORYS12 and 0.757 °C against 9,469 independent Argo measurements.'
+      + (s?.rmse_c != null ? ` Live, last 30 days: ${f2(s.rmse_c, 3)} °C against ${s.profiles} Argo profiles (bias ${f2(s.bias_c, 3)} °C) — higher because near-real-time inputs replace the reprocessed ones used in training.` : '')
+      + ' Uncertainty: 57 % of Argo errors fall inside ±1σ (68 % would be ideal).'
+  }
+  if (/live|latest|update|status|delay|input|satellite|when/.test(t)) {
+    const s = ctx.live_status
+    if (!s) return 'Live status is not available right now.'
+    return `Last live run: ${s.updated_at?.replace('T', ' ').slice(0, 16)} UTC; newest prediction ${s.last_predicted} (${s.predicted_days} days predicted). Newest satellite data: `
+      + s.sources.map((x) => `${x.source} ${x.newest} (${x.delay_days} d delay)`).join('; ') + '. Days are predicted again when late salinity or winds arrive.'
+  }
+  if (/model|architect|how does|work|train|network|embedding/.test(t)) {
+    return 'The Sylithe Ocean Model reads 15 days of SST, SSS, sea level anomaly, currents and winds (each also as an anomaly), passes them through a 3-D stem with temporal attention and a CBAM encoder '
+      + 'to a 64-d embedding (pretrained as a masked autoencoder), and a U-Net++ decoder predicts the anomaly from climatology plus an uncertainty at 15 depths, 0–1000 m. '
+      + 'Three seeds are averaged. Trained on GLORYS12 2005–2021, validated 2022, tested 2023. More on the Model page.'
+  }
+  return null
+}
+
 export default function Copilot() {
   const { m } = useData()
   const view = useView()
@@ -99,11 +153,12 @@ export default function Copilot() {
       const r = await fetch('/api/agent', { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question: text, history, context: await liveContext(view, window.location.pathname) }) })
       const j = await r.json().catch(() => ({}))
-      reply = r.ok ? j.answer : j.error === 'no_key'
-        ? 'The agent is not connected yet: the server needs DEEPSEEK_API_KEY (web/.env.local locally, or the Vercel environment when deployed). Map commands such as "temperature at 150 m" still work.'
-        : `The agent could not answer (${j.message ?? r.status}).`
-    } catch {
-      reply = 'The agent endpoint is not reachable from this build. Map commands such as "temperature at 150 m" still work.'
+      if (r.ok) reply = j.answer
+    } catch { /* endpoint unreachable: answer locally */ }
+    if (!reply) {
+      const local = await localAnswer(text, await liveContext(view, window.location.pathname)).catch(() => null)
+      reply = local ? `${local}\n\n· Answered from live data (DeepSeek not connected on this server).`
+        : 'DeepSeek is not connected on this server, and this question needs it. Without it I can answer about cyclone potential and hotspots, accuracy, errors by depth, the benchmark, live status and the model. Map commands such as "temperature at 150 m" also work.'
     }
     setLog((l) => [...l.filter((e) => !e.pending), { who: 'Sylithe agent', text: reply }])
   }
