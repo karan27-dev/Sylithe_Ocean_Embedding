@@ -61,7 +61,12 @@ export function Footer() {
     <footer className="mt-24 border-t border-line">
       <div className="page flex flex-col gap-3 py-8 text-[12px] text-mute sm:flex-row sm:items-center sm:justify-between">
         <p>Sylithe Ocean Model · Reconstructing the ocean beneath the surface.</p>
-        <p>Colour maps: cmocean (Thyng et al., 2016). Basemap © Esri.</p>
+        <p className="flex flex-wrap gap-x-4">
+          <Link to="/pipeline" className="hover:text-ink">Pipeline</Link>
+          <Link to="/data" className="hover:text-ink">Data &amp; downloads</Link>
+          <Link to="/docs" className="hover:text-ink">Docs</Link>
+          <span>Colour maps: cmocean. Imagery and basemap © Esri.</span>
+        </p>
       </div>
     </footer>
   )

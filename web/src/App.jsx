@@ -11,6 +11,8 @@ import Pipeline from './pages/Pipeline'
 import Model from './pages/Model'
 import Downloads from './pages/Downloads'
 import Daily from './pages/Daily'
+import Research from './pages/Research'
+import Docs from './pages/Docs'
 import { useManifest } from './lib/data'
 import { useView } from './lib/store'
 
@@ -23,10 +25,10 @@ export const NAV = [
   { to: '/explorer', label: 'Explorer' },
   { to: '/cyclone', label: 'Cyclone watch' },
   { to: '/validation', label: 'Validation' },
+  { to: '/research', label: 'Research' },
   { to: '/embedding', label: 'Embedding' },
   { to: '/model', label: 'Model' },
-  { to: '/pipeline', label: 'Pipeline' },
-  { to: '/data', label: 'Data' },
+  { to: '/docs', label: 'Docs' },
 ]
 
 export default function App() {
@@ -56,6 +58,8 @@ export default function App() {
             <Route path="/pipeline" element={<Pipeline />} />
             <Route path="/model" element={<Model />} />
             <Route path="/data" element={<Downloads />} />
+            <Route path="/research" element={<Research />} />
+            <Route path="/docs" element={<Docs />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>

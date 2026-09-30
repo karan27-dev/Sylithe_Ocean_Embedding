@@ -17,13 +17,14 @@ const STEPS = [
 ]
 
 const INDEX = [
-  ['/explorer', 'Explorer', 'Any day, any depth. Probe a point for its full profile, section and nearby Argo floats.'],
-  ['/embedding', 'Embedding', 'The latent representation, side by side with the surface it reads and the ocean it predicts.'],
-  ['/validation', 'Validation', 'Depth-wise skill against independent Argo profiles, float by float.'],
+  ['/daily', 'Daily forecast', 'Each day\'s satellite inputs and the model\'s prediction, by week, month, quarter or year, computed once and cached.'],
+  ['/explorer', 'Explorer', 'Any day, any depth, on satellite imagery. Click a point for its full profile, section and nearby Argo floats.'],
   ['/cyclone', 'Cyclone watch', 'Upper-ocean heat available to cyclones: TCHP, D26 and a daily bulletin.'],
-  ['/pipeline', 'Pipeline', 'Sources, harmonisation to the 0.25° daily grid, and storage.'],
+  ['/validation', 'Validation', 'Depth-wise skill against independent Argo profiles, float by float.'],
+  ['/research', 'Research', 'Leaderboard against the published state of the art, significance tests and every figure.'],
+  ['/embedding', 'Embedding', 'The latent representation, side by side with the surface it reads and the ocean it predicts.'],
   ['/model', 'Model', 'Architecture, training stages, losses and the experiments reported.'],
-  ['/data', 'Data', 'Output format, variables and downloads.'],
+  ['/docs', 'Docs', 'How to use the console, how it works, data formats, running it yourself and limitations.'],
 ]
 
 /** Small RMSE-by-depth trace for the validation teaser. */
