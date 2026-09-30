@@ -95,3 +95,10 @@ input[type='range'].slider:active::-webkit-slider-thumb { transform: scale(1.2);
 
 .no-scrollbar { scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* ---------------------------------------------------------------- print (bulletin) */
+@media print {
+  header, footer, .leaflet-control-container { display: none !important; }
+  body { background: #fff; }
+  @page { margin: 14mm; }
+}
