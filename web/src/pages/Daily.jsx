@@ -71,14 +71,23 @@ function LiveStatus({ status, skill }) {
   )
 }
 
-function Kpi({ label, value, prev, unit, dp, alert, note }) {
+const stat = (vals) => {
+  const v = vals.filter(Number.isFinite)
+  return v.length ? { mean: v.reduce((a, b) => a + b, 0) / v.length, min: Math.min(...v), max: Math.max(...v) } : null
+}
+const delta = (d, dp) => `${d >= 0 ? '▲ +' : '▼ '}${d.toFixed(dp)}`
+
+function Kpi({ label, value, prev, unit, dp, alert, note, span, series }) {
   const d = Number.isFinite(value) && Number.isFinite(prev) ? value - prev : NaN
+  const st = series && stat(series)
   return (
     <div className="min-w-0 rounded-[10px] border border-line bg-paper px-4 py-3">
       <p className="label truncate">{label}</p>
       <p className={`num mt-1.5 text-[24px] leading-none ${alert ? 'text-heat' : 'text-ink'}`}>{fmt(value, dp)}
         <span className="ml-1 text-[11px] text-faint">{unit}</span></p>
-      <p className="num mt-1.5 text-[11px] text-mute">{Number.isFinite(d) ? `${d >= 0 ? '▲ +' : '▼ '}${d.toFixed(dp)} vs 7 days before` : note ?? '—'}</p>
+      <p className="num mt-1.5 text-[11px] text-mute">{Number.isFinite(d) ? `${delta(d, dp)} vs ${span} ago` : note ?? '—'}</p>
+      {st && <p className="num mt-1 border-t border-line pt-1 text-[10.5px] text-faint">{span}: mean {fmt(st.mean, dp)} · {fmt(st.min, dp)}–{fmt(st.max, dp)}</p>}
+      {note && Number.isFinite(d) && <p className="num mt-0.5 text-[10.5px] text-faint">{note}</p>}
     </div>
   )
 }
@@ -186,6 +195,9 @@ export default function Daily() {
   }
 
   const today = rec(date), before = rec(addDays(date, -7)), month = rec(addDays(date, -30))
+  const spanDays = RANGES.find((r) => r[0] === range)[2]
+  const span = { week: '7 days', month: '30 days', quarter: '91 days', year: '365 days' }[range]
+  const startRec = rec(addDays(date, -spanDays)) ?? rec(dates[0])
   const run = index?.runs?.[date]
   const areaLabel = isCustom ? custom.name : REGIONS[area].label
   const z = DEPTHS[depthK]
@@ -319,14 +331,15 @@ export default function Daily() {
               <div className="seg w-full">{RANGES.map(([k, l, nd]) => <button key={k} className="flex-1 disabled:cursor-not-allowed disabled:opacity-35" aria-pressed={range === k}
                 disabled={!rangeOk(nd)} title={rangeOk(nd) ? '' : `Needs ${Math.ceil(nd / 2)}+ predicted days; ${pool.length} so far`} onClick={() => setRange(k)}>{l}</button>)}</div>
               <p className="mt-2 text-[11.5px] text-mute">Graphs below the map cover {dates.length} day{dates.length === 1 ? '' : 's'} ending {fmtDate(date)}{isCustom ? ' (custom areas: mapped days only)' : ''}.
-                {' '}{pool.length} days of history so far; Quarter and Year open as the live record grows (or after a history backfill).</p>
+                {' '}{pool.length} days of history available.</p>
             </Side>
 
             {today && (
               <div className="grid grid-cols-2 gap-px border-b border-line bg-line">
-                {[['SST', today.sst, '°C', 2], [`T ${z} m`, today.T[depthK], '°C', 2], ['TCHP', today.tchp, 'kJ cm⁻²', 0], ['D26', today.d26, 'm', 0]].map(([l, v, u, dp]) => (
+                {[['SST', today.sst, startRec?.sst, '°C', 2], [`T ${z} m`, today.T[depthK], startRec?.T?.[depthK], '°C', 2], ['TCHP', today.tchp, startRec?.tchp, 'kJ cm⁻²', 0], ['D26', today.d26, startRec?.d26, 'm', 0]].map(([l, v, p0, u, dp]) => (
                   <div key={l} className="bg-paper px-4 py-2.5"><p className="label">{l}</p>
-                    <p className={`num mt-0.5 text-[18px] leading-none ${l === 'TCHP' && v >= 50 ? 'text-heat' : 'text-ink'}`}>{fmt(v, dp)} <span className="text-[10.5px] text-faint">{u}</span></p></div>))}
+                    <p className={`num mt-0.5 text-[18px] leading-none ${l === 'TCHP' && v >= 50 ? 'text-heat' : 'text-ink'}`}>{fmt(v, dp)} <span className="text-[10.5px] text-faint">{u}</span></p>
+                    {Number.isFinite(v - p0) && <p className="num mt-1 text-[10.5px] text-mute">{delta(v - p0, dp)} vs {span} ago</p>}</div>))}
               </div>
             )}
           </div>
@@ -387,15 +400,15 @@ export default function Daily() {
       </div>
 
       <div className="page">
-      <SectionHead className="pt-10" label={`Prediction · ${areaLabel} · ${fmtDate(date)} · area mean`} title="Today's numbers" />
+      <SectionHead className="pt-10" label={`Prediction · ${areaLabel} · ${fmtDate(date)} · area mean`} title={`Today's numbers, against ${span} ago`} />
       {today ? (
         <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          <Kpi label="Sea surface temp." value={today.sst} prev={before?.sst} unit="°C" dp={2} />
-          <Kpi label={`Temperature ${z} m`} value={today.T[depthK]} prev={before?.T[depthK]} unit="°C" dp={2} />
-          <Kpi label={`Uncertainty ${z} m`} value={today.sigma[depthK]} prev={before?.sigma[depthK]} unit="± °C" dp={2} />
-          <Kpi label="26 °C isotherm" value={today.d26} prev={before?.d26} unit="m" dp={0} />
-          <Kpi label="Mixed layer" value={today.mld} prev={before?.mld} unit="m" dp={0} />
-          <Kpi label="Cyclone heat (TCHP)" value={today.tchp} prev={before?.tchp} unit="kJ cm⁻²" dp={0} alert={today.tchp >= 50}
+          <Kpi label="Sea surface temp." value={today.sst} prev={startRec?.sst} span={span} series={pick('sst')} unit="°C" dp={2} />
+          <Kpi label={`Temperature ${z} m`} value={today.T[depthK]} prev={startRec?.T?.[depthK]} span={span} series={pickK('T', depthK)} unit="°C" dp={2} />
+          <Kpi label={`Uncertainty ${z} m`} value={today.sigma[depthK]} prev={startRec?.sigma?.[depthK]} span={span} series={pickK('sigma', depthK)} unit="± °C" dp={2} />
+          <Kpi label="26 °C isotherm" value={today.d26} prev={startRec?.d26} span={span} series={pick('d26')} unit="m" dp={0} />
+          <Kpi label="Mixed layer" value={today.mld} prev={startRec?.mld} span={span} series={pick('mld')} unit="m" dp={0} />
+          <Kpi label="Cyclone heat (TCHP)" value={today.tchp} prev={startRec?.tchp} span={span} series={pick('tchp')} unit="kJ cm⁻²" dp={0} alert={today.tchp >= 50}
             note={Number.isFinite(today.tchp_ge50) ? `${Math.round(today.tchp_ge50 * 100)} % of area ≥ 50` : null} />
         </div>
       ) : <p className="mt-4 text-[13px] text-mute">{isCustom ? (loading ? 'Loading this area…' : 'The custom area has maps only for the most recent days: pick one of them, or a preset region.') : 'No data for this day.'}</p>}
