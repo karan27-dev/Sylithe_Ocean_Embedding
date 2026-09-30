@@ -38,7 +38,7 @@ export const score = (r, v) => clamp01((v - r.lo) / (r.hi - r.lo))
 /** Ocean Cyclone Potential Index from a dict of drivers; missing drivers are left out and the weights renormalised. */
 export function ocpi(x) {
   const s = x.sst ?? x.t0
-  if (!ok(s)) return { value: NaN, parts: {} }
+  if (!ok(s) || !ok(x.t100)) return { value: NaN, parts: {} }      // open ocean only: shelves < 100 m are left out
   if (s < 26) return { value: 0, parts: {}, gated: true }
   let a = 0, w = 0
   const parts = {}

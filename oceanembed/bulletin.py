@@ -47,7 +47,10 @@ Do not forecast cyclone genesis, track, intensity or landfall: the data describe
 vertical wind shear, humidity and other atmospheric conditions are not assessed.
 Write 120–180 words: a one-line headline, then Bay of Bengal, Arabian Sea, hotspots
 (with coordinates and their strongest drivers), any disturbance-over-warm-ocean watch points,
-the 7-day change, and the caveats listed in the JSON."""
+the 7-day change, and the caveats listed in the JSON.
+End with "Watch next:" and two short, specific suggestions for forecasters, each tied to a hotspot,
+watch point or trend in the JSON (e.g. which coordinates to monitor and why).
+Plain text with short section labels; no markdown tables."""
 
 
 def _r(v, d=2):
@@ -117,6 +120,9 @@ def ocpi(x: dict) -> tuple[np.ndarray, dict]:
     out = np.where(den > 0, num / np.maximum(den, 1e-9), np.nan)
     out = np.where(s < 26, 0.0, out)
     out[~np.isfinite(s)] = np.nan
+    t100 = x.get("t100")
+    if t100 is not None:                       # open ocean only: shelves shallower than 100 m are left out
+        out[~np.isfinite(t100)] = np.nan
     return out, parts
 
 
@@ -232,15 +238,19 @@ def _numbers(obj):
 
 
 def check(text: str, payload: dict) -> list[str]:
-    """Numbers in `text` that cannot be traced to the payload (shares may appear as percentages)."""
-    allowed = set()
-    for v in _numbers(payload):
-        allowed |= {round(v, 3), round(abs(v), 3), round(v * 100, 1), round(abs(v) * 100, 1), round(v * 100), round(abs(v) * 100)}
+    """Numbers in `text` that cannot be traced to the payload, compared at the precision they are written with
+    (shares may appear as percentages; small integers and the date's parts are allowed as labels)."""
+    vals = [v for v in _numbers(payload)]
+    y, mo, d = (int(x) for x in payload["date"].split("-"))
+    labels = set(range(0, 11)) | {y, mo, d}
     bad = []
-    for s in re.findall(r"\d+(?:\.\d+)?", text):
-        v = float(s)
-        if not ({round(v, 3), round(v, 1), round(v)} & allowed):
-            bad.append(s)
+    for s_ in re.findall(r"\d+(?:\.\d+)?", text):
+        v, dec = float(s_), len(s_.split(".")[1]) if "." in s_ else 0
+        if dec == 0 and int(v) in labels:
+            continue
+        if any(round(abs(p), dec) == v or round(abs(p) * 100, dec) == v for p in vals):
+            continue
+        bad.append(s_)
     return bad
 
 
