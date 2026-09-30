@@ -85,3 +85,65 @@ def mld(T, dT=0.5):
 def heat_content(T, zmax=300.0):
     zf, Tf = _fine(T, zmax=zmax)
     return RHO * CP * np.nansum(Tf, 0) * (zf[1] - zf[0])        # J m⁻² (relative to 0 °C)
+
+
+# ---------------------------------------------------------------- vectorised, exact piecewise-linear versions
+# Same definitions as above (and as the web console's ocean.js), evaluated on the 15 standard levels with
+# linear interpolation between them, for every column at once: ~1000× faster than the 1 m resampling above.
+# Used by the daily pipeline, which needs these diagnostics for 365 days × ~24k cells.
+
+def _cols(T):
+    """(depth, ...) → (depth, n) float64 plus the original trailing shape."""
+    T = np.asarray(T, dtype="f8")
+    return T.reshape(T.shape[0], -1), T.shape[1:]
+
+
+def isotherm_depth_fast(T, iso):
+    A, shape = _cols(T)
+    out = np.full(A.shape[1], np.nan)
+    surf = A[0]
+    out[surf <= iso] = 0.0
+    todo = np.isfinite(surf) & (surf > iso)
+    for k in range(1, len(Z)):
+        t0, t1 = A[k - 1], A[k]
+        hit = todo & np.isfinite(t1) & (t1 <= iso)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            out[hit] = Z[k - 1] + (t0[hit] - iso) / (t0[hit] - t1[hit]) * (Z[k] - Z[k - 1])
+        todo &= ~hit & np.isfinite(t1)                 # sea floor reached: stays NaN
+    out[~np.isfinite(surf)] = np.nan
+    return out.reshape(shape)
+
+
+def tchp_fast(T):
+    """kJ cm⁻², exact integral of (T − 26)⁺ down to the 26 °C isotherm of the piecewise-linear profile."""
+    A, shape = _cols(T)
+    J = np.zeros(A.shape[1])
+    live = np.isfinite(A[0]) & (A[0] > 26)
+    for k in range(1, len(Z)):
+        t0, t1, dz = A[k - 1], A[k], Z[k] - Z[k - 1]
+        ok = live & np.isfinite(t1)
+        full = ok & (t1 >= 26)
+        J[full] += ((t0[full] + t1[full]) / 2 - 26) * dz
+        part = ok & (t1 < 26)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            zc = (t0[part] - 26) / (t0[part] - t1[part]) * dz
+        J[part] += (t0[part] - 26) / 2 * zc
+        live &= full
+    out = RHO * CP * J / 1e7
+    out[~np.isfinite(A[0])] = np.nan
+    return out.reshape(shape)
+
+
+def mld_fast(T, dT=0.5):
+    A, shape = _cols(T)
+    ref = A[2]                                          # 10 m
+    thr = ref - dT
+    out = np.full(A.shape[1], np.nan)
+    todo = np.isfinite(ref)
+    for k in range(3, len(Z)):
+        t0, t1 = A[k - 1], A[k]
+        hit = todo & np.isfinite(t1) & (t1 < thr)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            out[hit] = Z[k - 1] + (t0[hit] - thr[hit]) / (t0[hit] - t1[hit]) * (Z[k] - Z[k - 1])
+        todo &= ~hit & np.isfinite(t1)
+    return out.reshape(shape)
