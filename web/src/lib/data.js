@@ -85,8 +85,8 @@ export function useDays(m, dates) {
   useEffect(() => {
     if (!m || !dates) return
     let live = true
-    dates.forEach((d) => loadDay(m, d).then((x) => live && set((s) => ({ ...s, [d]: x }))))
+    dates.forEach((d) => loadDay(m, d).then((x) => live && set((s) => ({ ...s, [d]: x })), (e) => console.warn(`day ${d}:`, e.message)))
     return () => { live = false }
   }, [m, key])                                             // eslint-disable-line react-hooks/exhaustive-deps
-  return dates ? dates.map((d) => got[d]).filter(Boolean) : []
+  return dates ? dates.map((d) => got[d]).filter(Boolean).sort((a, b) => (a.date < b.date ? -1 : 1)) : []
 }
