@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Download, FileUp, Layers, MousePointer2, Pentagon, Square, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, ChevronDown, ChevronLeft, ChevronRight, Download, FileUp, MousePointer2, Pentagon, Square, Trash2 } from 'lucide-react'
 import OceanMap from '../components/map/OceanMap'
 import AoiTools from '../components/map/AoiTools'
 import Legend from '../components/map/Legend'
@@ -31,7 +31,7 @@ function LiveStatus({ status, skill }) {
   if (!status) return null
   const src = Object.values(status.sources ?? {})
   return (
-    <section className="mt-8 grid gap-8 border-b border-line pb-8 lg:grid-cols-[1.4fr_1fr]">
+    <section className="mt-5 grid gap-8 lg:grid-cols-[1.4fr_1fr]">
       <div>
         <p className="label mb-2">Satellite feeds · checked {ago(status.updated_at)}</p>
         <table className="w-full text-[12.5px]">
@@ -98,12 +98,51 @@ const CsvBtn = ({ onClick }) => (
   <button onClick={onClick} className="inline-flex shrink-0 items-center gap-1 text-[11.5px] text-mute hover:text-ink"><Download size={13} />CSV</button>
 )
 
-function ToolBtn({ on, onClick, title, children }) {
+const INPUTS = [
+  { v: 'sst', label: 'SST', name: 'Sea surface temperature', live: 'OSTIA NRT', re: 'OSTIA L4' },
+  { v: 'sss', label: 'SSS', name: 'Sea surface salinity', live: 'SMOS/SMAP multi-obs NRT', re: 'SMOS/SMAP multi-obs L4' },
+  { v: 'sla', label: 'SLA', name: 'Sea level anomaly', live: 'DUACS NRT', re: 'DUACS DT' },
+  { v: 'uc', label: 'U/V', name: 'Surface currents', live: 'DUACS geostrophic', re: 'OSCAR' },
+  { v: 'uw', label: 'Wind', name: '10 m winds', live: 'ASCAT-blended L4', re: 'CCMP v3' },
+]
+
+/** Collapsible block of the left sidebar, numbered in the order a user works through it. */
+function Side({ n, title, aside, open: init = true, children }) {
+  const [open, setOpen] = useState(init)
+  return (
+    <section className="border-b border-line">
+      <button onClick={() => setOpen((o) => !o)} className="flex w-full items-center gap-2.5 px-4 py-3 text-left hover:bg-wash">
+        <span className="num flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-ink text-[10.5px] text-[#A3E635]">{n}</span>
+        <span className="text-[13px] text-ink">{title}</span>
+        <span className="ml-auto truncate text-[11px] text-mute">{aside}</span>
+        <ChevronDown size={14} className={`shrink-0 text-faint transition-transform ${open ? '' : '-rotate-90'}`} />
+      </button>
+      {open && <div className="px-4 pb-4">{children}</div>}
+    </section>
+  )
+}
+
+function SideTool({ on, onClick, title, children, className = '' }) {
   return (
     <button onClick={onClick} title={title} aria-pressed={on}
-      className={`flex h-9 items-center gap-1.5 rounded-[8px] border px-2.5 text-[12px] backdrop-blur transition-colors ${on ? 'border-[#A3E635] bg-ink text-[#A3E635]' : 'border-white/20 bg-ink/75 text-paper hover:bg-ink'}`}>
+      className={`flex h-9 items-center justify-center gap-1.5 rounded-[7px] border px-2 text-[12px] transition-colors ${on ? 'border-ink bg-ink text-[#A3E635]' : 'border-line bg-paper text-ink2 hover:border-line2 hover:text-ink'} ${className}`}>
       {children}
     </button>
+  )
+}
+
+const field = 'h-9 w-full rounded-[7px] border border-line bg-paper px-2.5 text-[13px] text-ink focus:border-sea focus:outline-none'
+
+/** Cursor readout; owns its state so mouse moves do not re-render the page. */
+function HoverChip({ bind, layer, depth }) {
+  const [h, set] = useState(null)
+  useEffect(() => { bind.current = set }, [bind])
+  if (!h || !Number.isFinite(h.v)) return null
+  return (
+    <div className="pointer-events-none absolute bottom-3 left-1/2 z-[700] -translate-x-1/2 rounded-full bg-ink/85 px-3 py-1.5 text-[11.5px] text-paper backdrop-blur">
+      <span className="num">{fmtLat(h.lat)} {fmtLon(h.lon)}</span><span className="mx-2 text-paper/40">·</span>
+      {layer.label}{layer.perDepth ? ` ${depth} m` : ''} <span className="num text-[#A3E635]">{fmt(h.v, layer.dp)} {layer.unit}</span>
+    </div>
   )
 }
 
@@ -136,6 +175,9 @@ export default function Daily() {
   const [zmax, setZmax] = useState(500)
   const [err, setErr] = useState(null)
   const fileRef = useRef(null)
+  const hoverRef = useRef(null)
+  const [frame, setFrame] = useState('BoB')           // region the map is framed on
+  useEffect(() => { if (area in REGIONS) setFrame(area) }, [area])
 
   useEffect(() => { if (all.length && (!date || !(date in series.days))) setDate(all[all.length - 1]) }, [all, date, series])
 
@@ -204,49 +246,166 @@ export default function Daily() {
   const probeCol = probe && day ? DEPTHS.map((_, k) => day.temp[k * ops.N + probe.i]) : null
   const probeSig = probe && day?.sigma ? DEPTHS.map((_, k) => day.sigma[k * ops.N + probe.i]) : null
 
-  return (
-    <div className="page pb-12 pt-10">
-      {/* ------------------------------------------------ header */}
-      <div className="flex flex-wrap items-start justify-between gap-6">
-        <SectionHead as="h1" label={`${live ? 'Live' : '2023 replay'} · ${all.length} days predicted · ${fmtDate(all[0])} – ${fmtDate(all[all.length - 1])}`}
-          title="Daily ocean forecast, surface to 1000 m">
-          {live
-            ? <>Every six hours the pipeline checks the satellite feeds; each new day of surface data is turned into a temperature forecast for 15 depths,
-              and recent days are updated when late inputs arrive. {status && <>Updated {ago(status.updated_at)}.</>}</>
-            : <>2023 replayed day by day with reprocessed inputs, the setting of every score on the Research page.</>}
-        </SectionHead>
-        <div className="pt-7">{modeSwitch}</div>
-      </div>
-      {liveDown && <p className="mt-4 border-l-2 border-heat pl-3 text-[13px] text-heat">The live feed is not reachable yet. Showing the 2023 replay.</p>}
-      {live && <LiveStatus status={status} skill={skill} />}
+  const L_z = L_.perDepth ? ` at ${z} m` : ''
+  const di = all.indexOf(date)
+  const src = (v) => Object.values(status?.sources ?? {}).find((x) => x.variables?.includes(v))
+  const use = (v) => (!run ? null : run.missing_today?.includes(v) ? 'pending' : run.inputs_valid?.[v] != null ? `${Math.round(run.inputs_valid[v] * 100)} %` : null)
+  const toAnalysis = () => document.getElementById('analysis')?.scrollIntoView({ behavior: 'smooth' })
+  const toMap = () => window.scrollTo({ top: 0, behavior: 'smooth' })
 
-      {/* ------------------------------------------------ controls */}
-      <div className="sticky top-[var(--bar)] z-[900] -mx-4 mt-6 flex flex-wrap items-end gap-3 border-y border-line bg-paper/95 px-4 py-3 backdrop-blur sm:-mx-8 sm:px-8 lg:-mx-12 lg:px-12">
-        <label className="flex flex-col gap-1"><span className="label">Date</span>
-          <input type="date" value={date} min={all[0]} max={all[all.length - 1]} onChange={(e) => e.target.value && setDate(e.target.value)}
-            className="num h-9 rounded-[7px] border border-line bg-paper px-2.5 text-[13px] text-ink focus:border-sea focus:outline-none" /></label>
-        <label className="flex flex-col gap-1"><span className="label">Area</span>
-          <select value={area} onChange={(e) => setArea(e.target.value)}
-            className="h-9 rounded-[7px] border border-line bg-paper px-2.5 text-[13px] text-ink focus:border-sea focus:outline-none">
-            {Object.entries(REGIONS).map(([k, r]) => <option key={k} value={k}>{r.label}</option>)}
-            <option value="custom" disabled={!custom}>{custom ? `Custom · ${custom.name}` : 'Custom area (import or draw on the map)'}</option>
-          </select></label>
-        <label className="flex flex-col gap-1"><span className="label">Depth</span>
-          <select value={depthK} onChange={(e) => setDepthK(+e.target.value)}
-            className="h-9 rounded-[7px] border border-line bg-paper px-2.5 text-[13px] text-ink focus:border-sea focus:outline-none">
-            {DEPTHS.map((d, k) => <option key={d} value={k}>{d} m</option>)}</select></label>
-        <div className="flex flex-col gap-1"><span className="label">Range</span>
-          <div className="seg h-9">{RANGES.map(([k, l]) => <button key={k} aria-pressed={range === k} onClick={() => setRange(k)}>{l}</button>)}</div></div>
-        <div className="ml-auto text-right text-[11.5px] text-mute">
-          {run && <p className="num">{run.members}-model ensemble · {run.window}-day window · {run.revision ? `update ${run.revision}` : 'first prediction'}</p>}
-          {isCustom && <p>Custom area: {dates.length} mapped day(s) in range</p>}
+  return (
+    <div className="pb-12">
+      {/* ================================================ workspace: sidebar + full map */}
+      <section className="flex flex-col border-b border-line lg:h-[calc(100dvh-var(--bar))] lg:flex-row">
+        <aside className="flex shrink-0 flex-col border-line bg-paper lg:w-[348px] lg:border-r">
+          <div className="border-b border-line px-4 pb-4 pt-4">
+            <p className="label">Sylithe Ocean Model · real-time prediction</p>
+            <h1 className="display mt-1 text-[22px] leading-tight text-ink">Ocean temperature, surface to 1000 m</h1>
+            <div className="mt-3 flex items-center justify-between gap-2">
+              {modeSwitch}
+              <span className="text-right text-[11px] text-mute">{live ? (status ? <>Checked {ago(status.updated_at)}<br />every 6 h</> : '') : 'Reprocessed 2023'}</span>
+            </div>
+            {liveDown && <p className="mt-2 text-[11.5px] text-heat">Live feed not reachable, showing the 2023 replay.</p>}
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <Side n={1} title="Satellite input" aside={live ? 'near real time' : 'reprocessed'}>
+              <p className="mb-2 text-[11.5px] text-mute">What the model reads for each day. {live
+                ? 'A day is predicted once SST and sea level arrive, and predicted again when late inputs land.'
+                : 'Reprocessed products, as used in training and evaluation.'}</p>
+              <table className="w-full text-[11.5px]">
+                <thead><tr className="text-left text-faint"><th className="py-1 font-normal">Input</th><th className="font-normal">Product</th>
+                  {live && <th className="font-normal">Newest</th>}<th className="text-right font-normal">{fmtDate(date).slice(0, 6)}</th></tr></thead>
+                <tbody>{INPUTS.map((x) => {
+                  const s_ = src(x.v), u = use(x.v)
+                  return (
+                    <tr key={x.v} className="border-t border-line" title={x.name}>
+                      <td className="py-1.5 pr-1 text-ink"><span className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full align-middle ${u === 'pending' ? 'bg-[#E0A526]' : 'bg-[#4D9F6A]'}`} />{x.label}</td>
+                      <td className="pr-1 text-mute">{live ? x.live : x.re}</td>
+                      {live && <td className={`num pr-1 ${s_?.lag_days > 3 ? 'text-heat' : 'text-ink2'}`}>{s_?.latest_available?.slice(5) ?? '—'}</td>}
+                      <td className={`num text-right ${u === 'pending' ? 'text-[#B7791F]' : 'text-ink2'}`}>{u ?? 'used'}</td>
+                    </tr>)
+                })}</tbody>
+              </table>
+            </Side>
+
+            <Side n={2} title="Prediction date" aside={fmtDate(date)}>
+              <div className="flex gap-1.5">
+                <SideTool onClick={() => di > 0 && setDate(all[di - 1])} title="Previous day"><ChevronLeft size={14} /></SideTool>
+                <input type="date" value={date} min={all[0]} max={all[all.length - 1]} onChange={(e) => e.target.value && setDate(e.target.value)} className={`num ${field}`} />
+                <SideTool onClick={() => di < all.length - 1 && setDate(all[di + 1])} title="Next day"><ChevronRight size={14} /></SideTool>
+                <SideTool onClick={() => setDate(all[all.length - 1])} title="Latest prediction">Latest</SideTool>
+              </div>
+              <p className="num mt-2 text-[11px] text-mute">{all.length} days predicted · {fmtDate(all[0])} – {fmtDate(all[all.length - 1])}</p>
+              {run && <p className="num mt-1 text-[11px] text-mute">{run.members}-model ensemble · {run.window}-day window · {run.revision ? `update ${run.revision}` : 'first prediction'}
+                {run.computed_at && ` · ${run.computed_at.replace('T', ' ').slice(0, 16)} UTC`}</p>}
+            </Side>
+
+            <Side n={3} title="Area of interest" aside={areaLabel}>
+              <select value={area} onChange={(e) => setArea(e.target.value)} className={field}>
+                {Object.entries(REGIONS).map(([k, r]) => <option key={k} value={k}>{r.label}</option>)}
+                <option value="custom" disabled={!custom}>{custom ? `Custom · ${custom.name}` : 'Custom (import or draw below)'}</option>
+              </select>
+              <div className="mt-2 grid grid-cols-2 gap-1.5">
+                <SideTool onClick={() => fileRef.current?.click()} title="KML, KMZ, GeoJSON, zipped shapefile or .shp + .dbf + .prj" className="col-span-2"><FileUp size={14} />Import KML / KMZ / GeoJSON / SHP</SideTool>
+                <SideTool on={draw === 'rect'} onClick={() => setDraw(draw === 'rect' ? null : 'rect')} title="Drag on the map"><Square size={14} />Rectangle</SideTool>
+                <SideTool on={draw === 'poly'} onClick={() => setDraw(draw === 'poly' ? null : 'poly')} title="Click points; double-click to finish"><Pentagon size={14} />Polygon</SideTool>
+                <SideTool on={!draw} onClick={() => setDraw(null)} title="Click the ocean to see its profile"><MousePointer2 size={14} />Point probe</SideTool>
+                <SideTool onClick={exportAoi} title="Download the area as GeoJSON"><Download size={14} />Export area</SideTool>
+              </div>
+              <input ref={fileRef} type="file" multiple accept=".kml,.kmz,.geojson,.json,.zip,.shp,.dbf,.prj,.shx" className="hidden"
+                onChange={(e) => { e.target.files?.length && onFiles(e.target.files); e.target.value = '' }} />
+              <div className="mt-2 rounded-[7px] bg-wash px-2.5 py-2 text-[11.5px]">
+                <div className="flex items-center justify-between gap-2"><span className="truncate text-ink">{areaLabel}</span>
+                  {custom && <button onClick={() => { setCustom(null); setArea('BoB') }} className="flex items-center gap-1 text-mute hover:text-heat"><Trash2 size={12} />Clear</button>}</div>
+                <p className="num text-mute">{Math.round(km2).toLocaleString('en-IN')} km²{isCustom && idx ? ` · ${idx.length} grid cells` : ''} · {isCustom ? custom.format : 'preset'}</p>
+                {isCustom && loading > 0 && <p className="text-mute">Loading {loading} more days for this area…</p>}
+              </div>
+              {err && <p className="mt-2 text-[11.5px] text-heat">{err}</p>}
+            </Side>
+
+            <Side n={4} title="Map layer" aside={`${L_.label}${L_.perDepth ? ` · ${z} m` : ''}`}>
+              {MAP_LAYERS.map(([g, ids]) => (
+                <div key={g} className="mb-2">
+                  <p className="label mb-1">{g}</p>
+                  <div className="grid grid-cols-2 gap-1">{ids.map((id) => {
+                    const l = layerById[id], ok = day && layerGrid(ops, day, id, depthK)
+                    return (
+                      <label key={id} className={`flex cursor-pointer items-center gap-1.5 rounded-[6px] border px-2 py-1.5 text-[12px] ${layer === id ? 'border-sea bg-seatint text-ink' : 'border-line text-ink2 hover:bg-wash'} ${ok ? '' : 'pointer-events-none opacity-40'}`}>
+                        <input type="radio" name="layer" checked={layer === id} disabled={!ok} onChange={() => setLayer(id)} className="accent-[rgb(var(--sea))]" />
+                        <span className="truncate">{l.short ?? l.label}</span>
+                      </label>)
+                  })}</div>
+                </div>
+              ))}
+              <label className="mt-1 block"><span className="label">Depth · {z} m</span>
+                <select value={depthK} onChange={(e) => setDepthK(+e.target.value)} className={`mt-1 ${field}`}>
+                  {DEPTHS.map((d, k) => <option key={d} value={k}>{d} m</option>)}</select></label>
+              <input type="range" className="slider mt-2 w-full" min={0} max={DEPTHS.length - 1} value={depthK} onChange={(e) => setDepthK(+e.target.value)} aria-label="Depth" />
+              <div className="mt-2"><p className="label mb-1">Opacity · {Math.round(opacity * 100)} %</p>
+                <input type="range" className="slider w-full" min={0.2} max={1} step={0.05} value={opacity} onChange={(e) => setOpacity(+e.target.value)} /></div>
+              <div className="mt-3"><p className="label mb-1">Basemap</p>
+                <div className="seg w-full">{[['satellite', 'Satellite'], ['light', 'Map']].map(([k, l]) =>
+                  <button key={k} className="flex-1" aria-pressed={basemap === k} onClick={() => setBasemap(k)}>{l}</button>)}</div></div>
+            </Side>
+
+            <Side n={5} title="Analysis range" aside={RANGES.find((r) => r[0] === range)[1]}>
+              <div className="seg w-full">{RANGES.map(([k, l]) => <button key={k} className="flex-1" aria-pressed={range === k} onClick={() => setRange(k)}>{l}</button>)}</div>
+              <p className="mt-2 text-[11.5px] text-mute">Graphs below the map cover {dates.length} day{dates.length === 1 ? '' : 's'} ending {fmtDate(date)}{isCustom ? ' (custom areas: mapped days only)' : ''}.</p>
+            </Side>
+
+            {today && (
+              <div className="grid grid-cols-2 gap-px border-b border-line bg-line">
+                {[['SST', today.sst, '°C', 2], [`T ${z} m`, today.T[depthK], '°C', 2], ['TCHP', today.tchp, 'kJ cm⁻²', 0], ['D26', today.d26, 'm', 0]].map(([l, v, u, dp]) => (
+                  <div key={l} className="bg-paper px-4 py-2.5"><p className="label">{l}</p>
+                    <p className={`num mt-0.5 text-[18px] leading-none ${l === 'TCHP' && v >= 50 ? 'text-heat' : 'text-ink'}`}>{fmt(v, dp)} <span className="text-[10.5px] text-faint">{u}</span></p></div>))}
+              </div>
+            )}
+          </div>
+
+          <button onClick={toAnalysis} className="flex items-center justify-center gap-2 border-t border-line bg-ink px-4 py-3 text-[13px] text-paper hover:text-[#A3E635]">
+            Full analysis below <ArrowDown size={14} /></button>
+        </aside>
+
+        <div className="relative h-[70vh] min-w-0 flex-1 lg:h-auto">
+          {ops && (
+            <OceanMap g={ops.grid} url={url} grid={grid} region={frame} showRegion={false} basemap={basemap} opacity={opacity} scrollZoom
+              onPick={draw ? null : (c) => setProbe(c)} onHover={(c) => hoverRef.current?.(c)} probe={probe} padding={[30, 30]}>
+              <AoiTools aoi={aoi} mode={draw} onDone={onDrawn} />
+            </OceanMap>
+          )}
+          <div className="absolute left-3 top-3 z-[700] rounded-[10px] border border-line bg-paper/95 px-3 py-2.5 backdrop-blur">
+            <p className="text-[12px] text-ink">{L_.label}{L_z} · <span className="num">{fmtDate(date)}</span></p>
+            {crange ? <Legend className="mt-2" layer={L_} range={crange} width={240} marks={layer === 'tchp' ? [{ v: 50, label: '50 kJ cm⁻²' }] : []} />
+              : <p className="mt-1 max-w-[240px] text-[11px] text-mute">{mapped.includes(date) ? 'Loading…' : `No map for this day: maps cover the last ${mapped.length} days.`}</p>}
+          </div>
+          {draw && <p className="absolute left-1/2 top-3 z-[700] -translate-x-1/2 rounded-full bg-ink/85 px-3 py-1.5 text-[12px] text-paper">
+            {draw === 'rect' ? 'Press and drag to draw a rectangle' : 'Click to add points · double-click or click the first point to finish'}</p>}
+          <HoverChip bind={hoverRef} layer={L_} depth={z} />
+          {probe && probeCol && (
+            <div className="absolute right-14 top-3 z-[700] w-[280px] rounded-[10px] border border-line bg-paper/95 p-3 backdrop-blur">
+              <div className="flex items-baseline justify-between"><p className="label">Point · {fmtLat(probe.lat)} {fmtLon(probe.lon)}</p>
+                <button onClick={() => setProbe(null)} className="text-[11px] text-mute hover:text-ink">Close</button></div>
+              <ProfileChart main={{ label: 'Prediction', values: probeCol, sigma: probeSig }} height={230} />
+              <p className="num mt-1 text-[11px] text-mute">Surface {fmt(probeCol[0], 2)} °C · {z} m {fmt(probeCol[depthK], 2)} °C ± {fmt(probeSig?.[depthK], 2)}</p>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* ================================================ analysis */}
+      <div id="analysis" className="sticky top-[var(--bar)] z-[900] border-b border-line bg-paper/95 backdrop-blur">
+        <div className="page flex flex-wrap items-center gap-x-5 gap-y-2 py-2.5 text-[12.5px]">
+          <span className="text-ink">{areaLabel}</span><span className="num text-mute">{fmtDate(date)}</span><span className="num text-mute">{z} m</span>
+          <div className="seg">{RANGES.map(([k, l]) => <button key={k} aria-pressed={range === k} onClick={() => setRange(k)}>{l}</button>)}</div>
+          <button onClick={toMap} className="ml-auto flex items-center gap-1 text-mute hover:text-ink"><ArrowUp size={13} />Map and controls</button>
         </div>
       </div>
 
-      {/* ------------------------------------------------ KPIs */}
-      <p className="label mt-6">{areaLabel} · {fmtDate(date)} · area mean</p>
+      <div className="page">
+      <SectionHead className="pt-10" label={`Prediction · ${areaLabel} · ${fmtDate(date)} · area mean`} title="Today's numbers" />
       {today ? (
-        <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           <Kpi label="Sea surface temp." value={today.sst} prev={before?.sst} unit="°C" dp={2} />
           <Kpi label={`Temperature ${z} m`} value={today.T[depthK]} prev={before?.T[depthK]} unit="°C" dp={2} />
           <Kpi label={`Uncertainty ${z} m`} value={today.sigma[depthK]} prev={before?.sigma[depthK]} unit="± °C" dp={2} />
@@ -255,84 +414,7 @@ export default function Daily() {
           <Kpi label="Cyclone heat (TCHP)" value={today.tchp} prev={before?.tchp} unit="kJ cm⁻²" dp={0} alert={today.tchp >= 50}
             note={Number.isFinite(today.tchp_ge50) ? `${Math.round(today.tchp_ge50 * 100)} % of area ≥ 50` : null} />
         </div>
-      ) : <p className="mt-2 text-[13px] text-mute">{isCustom ? 'The custom area has maps only for the most recent days: pick one of them, or a preset region.' : 'No data for this day.'}</p>}
-
-      {/* ------------------------------------------------ map workspace */}
-      <div className="relative mt-6 h-[640px] overflow-hidden rounded-[14px] border border-line">
-        {ops && (
-          <OceanMap g={ops.grid} url={url} grid={grid} region="NIO" showRegion={false} basemap={basemap} opacity={opacity} scrollZoom
-            onPick={draw ? null : (c) => setProbe(c)} probe={probe} padding={[20, 20]}>
-            <AoiTools aoi={aoi} mode={draw} onDone={onDrawn} />
-          </OceanMap>
-        )}
-
-        {/* layer panel */}
-        <div className="absolute left-3 top-3 z-[700] w-[248px]">
-          <button onClick={() => setPanel((p) => !p)} className="flex w-full items-center justify-between rounded-t-[10px] border border-line bg-paper/95 px-3 py-2 text-[12.5px] text-ink backdrop-blur">
-            <span className="flex items-center gap-2"><Layers size={14} />Layers</span><span className="text-faint">{panel ? '−' : '+'}</span></button>
-          {panel && (
-            <div className="max-h-[520px] overflow-y-auto rounded-b-[10px] border border-t-0 border-line bg-paper/95 px-3 pb-3 backdrop-blur">
-              {MAP_LAYERS.map(([g, ids]) => (
-                <div key={g} className="pt-3">
-                  <p className="label mb-1">{g}</p>
-                  {ids.map((id) => {
-                    const l = layerById[id], ok = day && layerGrid(ops, day, id, depthK)
-                    return (
-                      <label key={id} className={`flex cursor-pointer items-center gap-2 rounded-[6px] px-1.5 py-1 text-[12.5px] ${layer === id ? 'bg-seatint text-ink' : 'text-ink2 hover:bg-wash'} ${ok ? '' : 'opacity-40'}`}>
-                        <input type="radio" name="layer" checked={layer === id} disabled={!ok} onChange={() => setLayer(id)} className="accent-[rgb(var(--sea))]" />
-                        {l.label}{l.perDepth && <span className="ml-auto num text-[10.5px] text-faint">{z} m</span>}
-                      </label>
-                    )
-                  })}
-                </div>
-              ))}
-              {L_.perDepth && (
-                <div className="pt-3"><p className="label mb-1">Depth · {z} m</p>
-                  <input type="range" className="slider w-full" min={0} max={DEPTHS.length - 1} value={depthK} onChange={(e) => setDepthK(+e.target.value)} /></div>
-              )}
-              <div className="pt-2"><p className="label mb-1">Opacity · {Math.round(opacity * 100)} %</p>
-                <input type="range" className="slider w-full" min={0.2} max={1} step={0.05} value={opacity} onChange={(e) => setOpacity(+e.target.value)} /></div>
-              <div className="pt-3"><p className="label mb-1">Basemap</p>
-                <div className="seg w-full">{[['satellite', 'Satellite'], ['light', 'Map']].map(([k, l]) =>
-                  <button key={k} className="flex-1" aria-pressed={basemap === k} onClick={() => setBasemap(k)}>{l}</button>)}</div></div>
-            </div>
-          )}
-        </div>
-
-        {/* AOI toolbar */}
-        <div className="absolute right-14 top-3 z-[700] flex flex-wrap justify-end gap-1.5">
-          <ToolBtn onClick={() => fileRef.current?.click()} title="Import KML, KMZ, GeoJSON or a zipped shapefile"><FileUp size={14} />Import AOI</ToolBtn>
-          <input ref={fileRef} type="file" multiple accept=".kml,.kmz,.geojson,.json,.zip,.shp,.dbf,.prj,.shx" className="hidden"
-            onChange={(e) => { e.target.files?.length && onFiles(e.target.files); e.target.value = '' }} />
-          <ToolBtn on={draw === 'rect'} onClick={() => setDraw(draw === 'rect' ? null : 'rect')} title="Drag to draw a rectangle"><Square size={14} />Rectangle</ToolBtn>
-          <ToolBtn on={draw === 'poly'} onClick={() => setDraw(draw === 'poly' ? null : 'poly')} title="Click points; double-click to finish"><Pentagon size={14} />Polygon</ToolBtn>
-          <ToolBtn on={!draw} onClick={() => setDraw(null)} title="Click the ocean to read a point"><MousePointer2 size={14} />Probe</ToolBtn>
-          {custom && <ToolBtn onClick={() => { setCustom(null); setArea('BoB') }} title="Remove the custom area"><Trash2 size={14} /></ToolBtn>}
-          <ToolBtn onClick={exportAoi} title="Download the area as GeoJSON"><Download size={14} /></ToolBtn>
-        </div>
-        {draw && <p className="absolute left-1/2 top-16 z-[700] -translate-x-1/2 rounded-full bg-ink/85 px-3 py-1.5 text-[12px] text-paper">
-          {draw === 'rect' ? 'Press and drag to draw a rectangle' : 'Click to add points · double-click or click the first point to finish'}</p>}
-        {err && <p className="absolute left-1/2 top-16 z-[700] -translate-x-1/2 rounded-full bg-heat px-3 py-1.5 text-[12px] text-paper">{err}</p>}
-
-        {/* area card + legend */}
-        <div className="absolute bottom-3 left-3 z-[700] rounded-[10px] border border-line bg-paper/95 px-3 py-2.5 backdrop-blur">
-          {crange && <Legend layer={L_} range={crange} width={230} marks={layer === 'tchp' ? [{ v: 50, label: '50 kJ cm⁻²' }] : []} />}
-          <p className="mt-1.5 text-[11px] text-mute">{mapped.includes(date) ? `${L_.label}${L_.perDepth ? ` at ${z} m` : ''} · ${fmtDate(date)}` : `No map for ${fmtDate(date)}: maps cover the last ${mapped.length} days`}</p>
-        </div>
-        <div className="absolute bottom-3 right-3 z-[700] max-w-[260px] rounded-[10px] border border-line bg-paper/95 px-3 py-2.5 text-[12px] backdrop-blur">
-          <p className="label">Area of interest</p>
-          <p className="mt-0.5 truncate text-ink">{areaLabel}</p>
-          <p className="num text-[11px] text-mute">{Math.round(km2).toLocaleString('en-IN')} km²{isCustom && idx ? ` · ${idx.length} grid cells` : ''}{isCustom ? ` · ${custom.format}` : ' · preset'}</p>
-        </div>
-        {probe && probeCol && (
-          <div className="absolute right-3 top-16 z-[700] w-[270px] rounded-[10px] border border-line bg-paper/95 p-3 backdrop-blur">
-            <div className="flex items-baseline justify-between"><p className="label">Point · {fmtLat(probe.lat)} {fmtLon(probe.lon)}</p>
-              <button onClick={() => setProbe(null)} className="text-[11px] text-mute hover:text-ink">Close</button></div>
-            <ProfileChart main={{ label: 'Prediction', values: probeCol, sigma: probeSig }} height={230} />
-          </div>
-        )}
-      </div>
-
+      ) : <p className="mt-4 text-[13px] text-mute">{isCustom ? (loading ? 'Loading this area…' : 'The custom area has maps only for the most recent days: pick one of them, or a preset region.') : 'No data for this day.'}</p>}
       {/* ------------------------------------------------ depth-wise prediction */}
       <div className="mt-12 flex flex-wrap items-end justify-between gap-4">
         <SectionHead label="Depth-wise prediction" title={`The water column under ${areaLabel}`}>
@@ -428,6 +510,9 @@ export default function Daily() {
         ))}
       </div>
 
+      {/* ------------------------------------------------ live system */}
+      {live && <><SectionHead className="mt-12" label="Live system" title="Satellite feeds and live accuracy" /><LiveStatus status={status} skill={skill} /></>}
+
       {/* ------------------------------------------------ run log */}
       <SectionHead className="mt-12" label="Pipeline log" title="Recent runs" />
       <div className="mt-4 overflow-x-auto">
@@ -448,6 +533,7 @@ export default function Daily() {
               </tr>)
           })}</tbody>
         </table>
+      </div>
       </div>
     </div>
   )
