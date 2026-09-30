@@ -25,9 +25,9 @@ export default function Shell({ children }) {
   return (
     <div className="min-h-[100dvh]">
       <header className="sticky top-0 z-[1000] h-[var(--bar)] border-b border-line bg-paper/95 backdrop-blur-sm">
-        <div className="flex h-full items-center gap-8 px-4 sm:px-6">
+        <div className="grid h-full grid-cols-[1fr_auto] items-center gap-6 px-4 sm:px-6 lg:grid-cols-[1fr_auto_1fr]">
           <Wordmark />
-          <nav className="hidden h-full items-center gap-6 lg:flex" aria-label="Main">
+          <nav className="hidden h-full items-center justify-center gap-6 lg:flex" aria-label="Main">
             {NAV.map((n) => (
               <NavLink key={n.to} to={n.to} className={({ isActive }) =>
                 `relative flex h-full items-center text-[13px] transition-colors duration-150 ${isActive ? 'text-ink' : 'text-mute hover:text-ink'}`}>
@@ -35,11 +35,11 @@ export default function Shell({ children }) {
               </NavLink>
             ))}
           </nav>
-          <div className="ml-auto flex items-center gap-5">
-            <span className="hidden md:inline-flex"><SourceStatus /></span>
+          <div className="flex items-center justify-end gap-4">
             <button onClick={() => setView({ copilot: true })}
-              className="hidden items-center gap-2 text-[13px] text-mute transition-colors hover:text-ink sm:inline-flex">
-              Ask <kbd className="num rounded border border-line px-1.5 text-[10.5px] text-faint">/</kbd>
+              className="hidden h-8 items-center gap-2 rounded-full bg-ink pl-2 pr-3.5 text-[12.5px] text-paper transition-colors hover:text-[#A3E635] sm:inline-flex">
+              <img src="/sylithe-logo.png" alt="" className="h-5 w-5 rounded-full bg-white p-[1px]" />Ask Sylithe agent
+              <kbd className="num rounded border border-white/25 px-1.5 text-[10px] text-white/60">/</kbd>
             </button>
             {/* A word, not a hamburger: the logo mark is already three lines. */}
             <button onClick={() => setOpen((o) => !o)} className="-mr-1 px-1 py-2 text-[13px] text-ink lg:hidden" aria-expanded={open}>
