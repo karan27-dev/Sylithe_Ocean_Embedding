@@ -1,0 +1,100 @@
+{
+ "rows": [
+  {
+   "Method": "GLORYS12 reanalysis (the training target)",
+   "Type": "reference product",
+   "RMSE vs GLORYS (°C)": null,
+   "RMSE vs Argo (°C)": 0.684,
+   "Argo 0–200 m": 0.761,
+   "Argo 200–1000 m": 0.369,
+   "Argo Bay of Bengal": 0.758,
+   "Argo Arabian Sea": 0.68,
+   "Argo bias (°C)": 0.158,
+   "Argo points": 9469
+  },
+  {
+   "Method": "Sylithe Ocean Model (single model)",
+   "Type": "ours",
+   "RMSE vs GLORYS (°C)": 0.68,
+   "RMSE vs Argo (°C)": 0.754,
+   "Argo 0–200 m": 0.846,
+   "Argo 200–1000 m": 0.357,
+   "Argo Bay of Bengal": 0.853,
+   "Argo Arabian Sea": 0.749,
+   "Argo bias (°C)": 0.179,
+   "Argo points": 9469
+  },
+  {
+   "Method": "Sylithe Ocean Model (3-model ensemble)",
+   "Type": "ours",
+   "RMSE vs GLORYS (°C)": 0.662,
+   "RMSE vs Argo (°C)": 0.757,
+   "Argo 0–200 m": 0.85,
+   "Argo 200–1000 m": 0.355,
+   "Argo Bay of Bengal": 0.833,
+   "Argo Arabian Sea": 0.754,
+   "Argo bias (°C)": 0.206,
+   "Argo points": 9469
+  },
+  {
+   "Method": "Attention 3D U-Net++ (Wang et al. 2026), retrained here",
+   "Type": "published method (retrained here)",
+   "RMSE vs GLORYS (°C)": 0.668,
+   "RMSE vs Argo (°C)": 0.762,
+   "Argo 0–200 m": 0.856,
+   "Argo 200–1000 m": 0.363,
+   "Argo Bay of Bengal": 0.879,
+   "Argo Arabian Sea": 0.757,
+   "Argo bias (°C)": 0.218,
+   "Argo points": 9469
+  },
+  {
+   "Method": "Ridge regression (per-depth, local surface features)",
+   "Type": "baseline",
+   "RMSE vs GLORYS (°C)": 0.74,
+   "RMSE vs Argo (°C)": 0.804,
+   "Argo 0–200 m": 0.906,
+   "Argo 200–1000 m": 0.358,
+   "Argo Bay of Bengal": 0.894,
+   "Argo Arabian Sea": 0.801,
+   "Argo bias (°C)": 0.213,
+   "Argo points": 9469
+  },
+  {
+   "Method": "HYCOM GOFS 3.1 (independent model, via GEE)",
+   "Type": "reference product",
+   "RMSE vs GLORYS (°C)": 1.193,
+   "RMSE vs Argo (°C)": 0.806,
+   "Argo 0–200 m": 0.901,
+   "Argo 200–1000 m": 0.406,
+   "Argo Bay of Bengal": 0.763,
+   "Argo Arabian Sea": 0.813,
+   "Argo bias (°C)": -0.178,
+   "Argo points": 9469
+  },
+  {
+   "Method": "Climatology (GLORYS day-of-year mean)",
+   "Type": "baseline",
+   "RMSE vs GLORYS (°C)": 1.119,
+   "RMSE vs Argo (°C)": 0.952,
+   "Argo 0–200 m": 1.076,
+   "Argo 200–1000 m": 0.396,
+   "Argo Bay of Bengal": 1.005,
+   "Argo Arabian Sea": 0.947,
+   "Argo bias (°C)": -0.099,
+   "Argo points": 9469
+  }
+ ],
+ "context": [
+  {
+   "method": "Attention 3D U-Net++ (Wang et al., ESSD 18:4617, 2026)",
+   "rmse_argo": 0.61,
+   "setup": "NW Pacific 0–40°N 120–160°E, 5–2000 m, vs WOD profiles 2023, SST+SSH inputs"
+  },
+  {
+   "method": "DSVIT downscaling ViT (Deep-Sea Res. II, 2025)",
+   "rmse_target": 0.29,
+   "setup": "tropical Indian Ocean, vs its independent test set"
+  }
+ ]
+}

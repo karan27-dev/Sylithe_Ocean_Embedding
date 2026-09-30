@@ -1,0 +1,576 @@
+{
+ "version": 2,
+ "source": {
+  "kind": "model",
+  "label": "Sylithe Ocean Model daily forecast",
+  "detail": "Ensemble reconstruction from that day's satellite inputs, computed once by the daily pipeline and served from its cache."
+ },
+ "grid": {
+  "lon0": 45.0,
+  "lat0": 30.0,
+  "step": 0.25,
+  "width": 241,
+  "height": 101
+ },
+ "depths": [
+  0,
+  5,
+  10,
+  20,
+  30,
+  50,
+  75,
+  100,
+  125,
+  150,
+  200,
+  300,
+  500,
+  700,
+  1000
+ ],
+ "regions": {
+  "NIO": {
+   "lat": [
+    5,
+    30
+   ],
+   "lon": [
+    45,
+    105
+   ]
+  },
+  "BoB": {
+   "lat": [
+    5,
+    23
+   ],
+   "lon": [
+    80,
+    100
+   ]
+  },
+  "AS": {
+   "lat": [
+    5,
+    25
+   ],
+   "lon": [
+    50,
+    78
+   ]
+  }
+ },
+ "days": [
+  {
+   "date": "2023-12-01",
+   "layers": [
+    "temp",
+    "sigma",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw"
+   ]
+  },
+  {
+   "date": "2023-12-02",
+   "layers": [
+    "temp",
+    "sigma",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw"
+   ]
+  },
+  {
+   "date": "2023-12-03",
+   "layers": [
+    "temp",
+    "sigma",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw"
+   ]
+  },
+  {
+   "date": "2023-12-04",
+   "layers": [
+    "temp",
+    "sigma",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw"
+   ]
+  },
+  {
+   "date": "2023-12-05",
+   "layers": [
+    "temp",
+    "sigma",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw"
+   ]
+  },
+  {
+   "date": "2023-12-06",
+   "layers": [
+    "temp",
+    "sigma",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw"
+   ]
+  },
+  {
+   "date": "2023-12-07",
+   "layers": [
+    "temp",
+    "sigma",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw"
+   ]
+  },
+  {
+   "date": "2023-12-08",
+   "layers": [
+    "temp",
+    "sigma",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw"
+   ]
+  },
+  {
+   "date": "2023-12-09",
+   "layers": [
+    "temp",
+    "sigma",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw"
+   ]
+  },
+  {
+   "date": "2023-12-10",
+   "layers": [
+    "temp",
+    "sigma",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw"
+   ]
+  },
+  {
+   "date": "2023-12-11",
+   "layers": [
+    "temp",
+    "sigma",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw"
+   ]
+  },
+  {
+   "date": "2023-12-12",
+   "layers": [
+    "temp",
+    "sigma",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw"
+   ]
+  },
+  {
+   "date": "2023-12-13",
+   "layers": [
+    "temp",
+    "sigma",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw"
+   ]
+  },
+  {
+   "date": "2023-12-14",
+   "layers": [
+    "temp",
+    "sigma",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw"
+   ]
+  },
+  {
+   "date": "2023-12-15",
+   "layers": [
+    "temp",
+    "sigma",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw"
+   ]
+  },
+  {
+   "date": "2023-12-16",
+   "layers": [
+    "temp",
+    "sigma",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw"
+   ]
+  },
+  {
+   "date": "2023-12-17",
+   "layers": [
+    "temp",
+    "sigma",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw"
+   ]
+  },
+  {
+   "date": "2023-12-18",
+   "layers": [
+    "temp",
+    "sigma",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw"
+   ]
+  },
+  {
+   "date": "2023-12-19",
+   "layers": [
+    "temp",
+    "sigma",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw"
+   ]
+  },
+  {
+   "date": "2023-12-20",
+   "layers": [
+    "temp",
+    "sigma",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw"
+   ]
+  },
+  {
+   "date": "2023-12-21",
+   "layers": [
+    "temp",
+    "sigma",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw"
+   ]
+  },
+  {
+   "date": "2023-12-22",
+   "layers": [
+    "temp",
+    "sigma",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw"
+   ]
+  },
+  {
+   "date": "2023-12-23",
+   "layers": [
+    "temp",
+    "sigma",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw"
+   ]
+  },
+  {
+   "date": "2023-12-24",
+   "layers": [
+    "temp",
+    "sigma",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw"
+   ]
+  },
+  {
+   "date": "2023-12-25",
+   "layers": [
+    "temp",
+    "sigma",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw"
+   ]
+  },
+  {
+   "date": "2023-12-26",
+   "layers": [
+    "temp",
+    "sigma",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw"
+   ]
+  },
+  {
+   "date": "2023-12-27",
+   "layers": [
+    "temp",
+    "sigma",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw"
+   ]
+  },
+  {
+   "date": "2023-12-28",
+   "layers": [
+    "temp",
+    "sigma",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw"
+   ]
+  },
+  {
+   "date": "2023-12-29",
+   "layers": [
+    "temp",
+    "sigma",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw"
+   ]
+  },
+  {
+   "date": "2023-12-30",
+   "layers": [
+    "temp",
+    "sigma",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw"
+   ]
+  },
+  {
+   "date": "2023-12-31",
+   "layers": [
+    "temp",
+    "sigma",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw"
+   ]
+  }
+ ],
+ "layers": {
+  "temp": {
+   "scale": 0.001,
+   "offset": 20.0,
+   "unit": "°C",
+   "label": "Temperature",
+   "levels": 15
+  },
+  "sigma": {
+   "scale": 0.0005,
+   "offset": 0.0,
+   "unit": "°C",
+   "label": "Uncertainty (1σ)",
+   "levels": 15
+  },
+  "sst": {
+   "scale": 0.001,
+   "offset": 20.0,
+   "unit": "°C",
+   "label": "Sea surface temperature",
+   "levels": 1
+  },
+  "sss": {
+   "scale": 0.001,
+   "offset": 35.0,
+   "unit": "psu",
+   "label": "Sea surface salinity",
+   "levels": 1
+  },
+  "sla": {
+   "scale": 0.0001,
+   "offset": 0.0,
+   "unit": "m",
+   "label": "Sea level anomaly",
+   "levels": 1
+  },
+  "uc": {
+   "scale": 0.0001,
+   "offset": 0.0,
+   "unit": "m/s",
+   "label": "Current U",
+   "levels": 1
+  },
+  "vc": {
+   "scale": 0.0001,
+   "offset": 0.0,
+   "unit": "m/s",
+   "label": "Current V",
+   "levels": 1
+  },
+  "uw": {
+   "scale": 0.001,
+   "offset": 0.0,
+   "unit": "m/s",
+   "label": "Wind U",
+   "levels": 1
+  },
+  "vw": {
+   "scale": 0.001,
+   "offset": 0.0,
+   "unit": "m/s",
+   "label": "Wind V",
+   "levels": 1
+  }
+ },
+ "files": {
+  "series": "series.json",
+  "index": "index.json"
+ },
+ "nodata": -32768,
+ "ops": {
+  "first": "2023-01-01",
+  "last": "2023-12-31",
+  "cached": 365,
+  "maps": 31
+ }
+}

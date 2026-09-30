@@ -1,9 +1,9 @@
 {
  "version": 2,
  "source": {
-  "kind": "reference",
-  "label": "HYCOM GOFS 3.1 daily mean",
-  "detail": "Independent ocean model via Google Earth Engine, with NOAA OISST v2.1 as the surface input. Shown until the OceanEmbed reconstruction is exported by notebook 03."
+  "kind": "model",
+  "label": "Sylithe Ocean Model reconstruction",
+  "detail": "3-model ensemble from surface satellite observations only; test year never seen in training."
  },
  "grid": {
   "lon0": 45.0,
@@ -63,20 +63,531 @@
  },
  "days": [
   {
-   "date": "2024-01-15",
+   "date": "2023-05-01",
    "layers": [
     "temp",
-    "sst"
-   ],
-   "note": "Northeast monsoon · Bay of Bengal barrier layer"
+    "sigma",
+    "ref",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw",
+    "embed",
+    "cluster"
+   ]
   },
   {
-   "date": "2024-05-15",
+   "date": "2023-05-02",
    "layers": [
     "temp",
-    "sst"
-   ],
-   "note": "Pre-monsoon · peak cyclone-season heat"
+    "sigma",
+    "ref",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw",
+    "embed",
+    "cluster"
+   ]
+  },
+  {
+   "date": "2023-05-03",
+   "layers": [
+    "temp",
+    "sigma",
+    "ref",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw",
+    "embed",
+    "cluster"
+   ]
+  },
+  {
+   "date": "2023-05-04",
+   "layers": [
+    "temp",
+    "sigma",
+    "ref",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw",
+    "embed",
+    "cluster"
+   ]
+  },
+  {
+   "date": "2023-05-05",
+   "layers": [
+    "temp",
+    "sigma",
+    "ref",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw",
+    "embed",
+    "cluster"
+   ]
+  },
+  {
+   "date": "2023-05-06",
+   "layers": [
+    "temp",
+    "sigma",
+    "ref",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw",
+    "embed",
+    "cluster"
+   ]
+  },
+  {
+   "date": "2023-05-07",
+   "layers": [
+    "temp",
+    "sigma",
+    "ref",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw",
+    "embed",
+    "cluster"
+   ]
+  },
+  {
+   "date": "2023-05-08",
+   "layers": [
+    "temp",
+    "sigma",
+    "ref",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw",
+    "embed",
+    "cluster"
+   ]
+  },
+  {
+   "date": "2023-05-09",
+   "layers": [
+    "temp",
+    "sigma",
+    "ref",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw",
+    "embed",
+    "cluster"
+   ]
+  },
+  {
+   "date": "2023-05-10",
+   "layers": [
+    "temp",
+    "sigma",
+    "ref",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw",
+    "embed",
+    "cluster"
+   ]
+  },
+  {
+   "date": "2023-05-11",
+   "layers": [
+    "temp",
+    "sigma",
+    "ref",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw",
+    "embed",
+    "cluster"
+   ]
+  },
+  {
+   "date": "2023-05-12",
+   "layers": [
+    "temp",
+    "sigma",
+    "ref",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw",
+    "embed",
+    "cluster"
+   ]
+  },
+  {
+   "date": "2023-05-13",
+   "layers": [
+    "temp",
+    "sigma",
+    "ref",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw",
+    "embed",
+    "cluster"
+   ]
+  },
+  {
+   "date": "2023-05-14",
+   "layers": [
+    "temp",
+    "sigma",
+    "ref",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw",
+    "embed",
+    "cluster"
+   ]
+  },
+  {
+   "date": "2023-05-15",
+   "layers": [
+    "temp",
+    "sigma",
+    "ref",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw",
+    "embed",
+    "cluster"
+   ]
+  },
+  {
+   "date": "2023-05-16",
+   "layers": [
+    "temp",
+    "sigma",
+    "ref",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw",
+    "embed",
+    "cluster"
+   ]
+  },
+  {
+   "date": "2023-05-17",
+   "layers": [
+    "temp",
+    "sigma",
+    "ref",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw",
+    "embed",
+    "cluster"
+   ]
+  },
+  {
+   "date": "2023-05-18",
+   "layers": [
+    "temp",
+    "sigma",
+    "ref",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw",
+    "embed",
+    "cluster"
+   ]
+  },
+  {
+   "date": "2023-05-19",
+   "layers": [
+    "temp",
+    "sigma",
+    "ref",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw",
+    "embed",
+    "cluster"
+   ]
+  },
+  {
+   "date": "2023-05-20",
+   "layers": [
+    "temp",
+    "sigma",
+    "ref",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw",
+    "embed",
+    "cluster"
+   ]
+  },
+  {
+   "date": "2023-05-21",
+   "layers": [
+    "temp",
+    "sigma",
+    "ref",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw",
+    "embed",
+    "cluster"
+   ]
+  },
+  {
+   "date": "2023-05-22",
+   "layers": [
+    "temp",
+    "sigma",
+    "ref",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw",
+    "embed",
+    "cluster"
+   ]
+  },
+  {
+   "date": "2023-05-23",
+   "layers": [
+    "temp",
+    "sigma",
+    "ref",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw",
+    "embed",
+    "cluster"
+   ]
+  },
+  {
+   "date": "2023-05-24",
+   "layers": [
+    "temp",
+    "sigma",
+    "ref",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw",
+    "embed",
+    "cluster"
+   ]
+  },
+  {
+   "date": "2023-05-25",
+   "layers": [
+    "temp",
+    "sigma",
+    "ref",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw",
+    "embed",
+    "cluster"
+   ]
+  },
+  {
+   "date": "2023-05-26",
+   "layers": [
+    "temp",
+    "sigma",
+    "ref",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw",
+    "embed",
+    "cluster"
+   ]
+  },
+  {
+   "date": "2023-05-27",
+   "layers": [
+    "temp",
+    "sigma",
+    "ref",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw",
+    "embed",
+    "cluster"
+   ]
+  },
+  {
+   "date": "2023-05-28",
+   "layers": [
+    "temp",
+    "sigma",
+    "ref",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw",
+    "embed",
+    "cluster"
+   ]
+  },
+  {
+   "date": "2023-05-29",
+   "layers": [
+    "temp",
+    "sigma",
+    "ref",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw",
+    "embed",
+    "cluster"
+   ]
+  },
+  {
+   "date": "2023-05-30",
+   "layers": [
+    "temp",
+    "sigma",
+    "ref",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw",
+    "embed",
+    "cluster"
+   ]
+  },
+  {
+   "date": "2023-05-31",
+   "layers": [
+    "temp",
+    "sigma",
+    "ref",
+    "sst",
+    "sss",
+    "sla",
+    "uc",
+    "vc",
+    "uw",
+    "vw",
+    "embed",
+    "cluster"
+   ]
   }
  ],
  "layers": {
@@ -87,28 +598,113 @@
    "label": "Temperature",
    "levels": 15
   },
+  "sigma": {
+   "scale": 0.0005,
+   "offset": 0.0,
+   "unit": "°C",
+   "label": "Uncertainty (1σ)",
+   "levels": 15
+  },
+  "ref": {
+   "scale": 0.001,
+   "offset": 20.0,
+   "unit": "°C",
+   "label": "GLORYS12 reference",
+   "levels": 15
+  },
   "sst": {
    "scale": 0.001,
    "offset": 20.0,
    "unit": "°C",
    "label": "Sea surface temperature",
    "levels": 1
+  },
+  "sss": {
+   "scale": 0.001,
+   "offset": 35.0,
+   "unit": "psu",
+   "label": "Sea surface salinity",
+   "levels": 1
+  },
+  "sla": {
+   "scale": 0.0001,
+   "offset": 0.0,
+   "unit": "m",
+   "label": "Sea level anomaly",
+   "levels": 1
+  },
+  "uc": {
+   "scale": 0.0001,
+   "offset": 0.0,
+   "unit": "m/s",
+   "label": "Current U",
+   "levels": 1
+  },
+  "vc": {
+   "scale": 0.0001,
+   "offset": 0.0,
+   "unit": "m/s",
+   "label": "Current V",
+   "levels": 1
+  },
+  "uw": {
+   "scale": 0.001,
+   "offset": 0.0,
+   "unit": "m/s",
+   "label": "Wind U",
+   "levels": 1
+  },
+  "vw": {
+   "scale": 0.001,
+   "offset": 0.0,
+   "unit": "m/s",
+   "label": "Wind V",
+   "levels": 1
+  },
+  "embed": {
+   "scale": 3.3333333333333335e-05,
+   "offset": 0.0,
+   "unit": "",
+   "label": "Embedding (3 principal components, 0–1)",
+   "levels": 3
+  },
+  "cluster": {
+   "scale": 1.0,
+   "offset": 0.0,
+   "unit": "",
+   "label": "Latent ocean regime",
+   "levels": 1
   }
  },
  "files": {
   "argo": "argo.json",
-  "skill_depth": "skill_depth.json"
+  "skill_depth": "skill_depth.json",
+  "coverage": "coverage.json"
  },
  "nodata": -32768,
  "products": {
+  "ours": {
+   "label": "Sylithe Ocean Model",
+   "kind": "ours"
+  },
+  "glorys": {
+   "label": "GLORYS12",
+   "kind": "reference"
+  },
   "hycom": {
    "label": "HYCOM GOFS 3.1",
    "kind": "reference"
   }
  },
  "inputs": [
-  "sst"
+  "sst",
+  "sss",
+  "sla",
+  "uc",
+  "vc",
+  "uw",
+  "vw"
  ],
- "primary": "hycom",
- "argo_match": "profiles within ±3 days of the field day, nearest 0.25° cell"
+ "primary": "ours",
+ "argo_match": "same day, nearest 0.25° cell"
 }

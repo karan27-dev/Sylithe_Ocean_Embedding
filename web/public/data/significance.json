@@ -1,0 +1,62 @@
+[
+ {
+  "vs": "Sylithe Ocean Model (single model)",
+  "profiles": 663.0,
+  "rmse_ours": 0.7568023856470867,
+  "rmse_other": 0.7535470544081947,
+  "improvement": -0.0032553312388919897,
+  "ci95_low": -0.009833738799813216,
+  "ci95_high": 0.0032329485754916463,
+  "p_not_better": 0.832
+ },
+ {
+  "vs": "Attention 3D U-Net++ (Wang et al. 2026)",
+  "profiles": 663.0,
+  "rmse_ours": 0.7568023856470867,
+  "rmse_other": 0.7624330944703261,
+  "improvement": 0.005630708823239461,
+  "ci95_low": -0.0035043673456445377,
+  "ci95_high": 0.015129822834501877,
+  "p_not_better": 0.117
+ },
+ {
+  "vs": "Ridge regression",
+  "profiles": 663.0,
+  "rmse_ours": 0.7568023856470867,
+  "rmse_other": 0.8039573873600797,
+  "improvement": 0.04715500171299303,
+  "ci95_low": 0.029132928250328424,
+  "ci95_high": 0.06526365659563754,
+  "p_not_better": 0.0
+ },
+ {
+  "vs": "Climatology",
+  "profiles": 663.0,
+  "rmse_ours": 0.7568023856470867,
+  "rmse_other": 0.9518863463337084,
+  "improvement": 0.1950839606866217,
+  "ci95_low": 0.1674072577123836,
+  "ci95_high": 0.22350137933790773,
+  "p_not_better": 0.0
+ },
+ {
+  "vs": "HYCOM (independent model)",
+  "profiles": 663.0,
+  "rmse_ours": 0.7568023856470867,
+  "rmse_other": 0.8060034273257232,
+  "improvement": 0.04920104167863648,
+  "ci95_low": 0.0162640651218933,
+  "ci95_high": 0.08306738514272047,
+  "p_not_better": 0.002
+ },
+ {
+  "vs": "GLORYS12 reanalysis",
+  "profiles": 663.0,
+  "rmse_ours": 0.7568023856470867,
+  "rmse_other": 0.6836640499031074,
+  "improvement": -0.07313833574397932,
+  "ci95_low": -0.10211180544369275,
+  "ci95_high": -0.046477705104079226,
+  "p_not_better": 1.0
+ }
+]
