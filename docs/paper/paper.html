@@ -82,7 +82,10 @@
   (41 % below climatology) and 0.757 °C against 9,469 independent Argo measurements. Evaluated on identical data, it outperforms the
   published Attention 3D U-Net++ retrained here (0.762 °C), ridge regression (0.804 °C), climatology (0.952 °C) and the HYCOM GOFS 3.1
   operational analysis (0.806 °C); paired bootstrap tests show the gain over the published architecture is significant below 200 m
-  (p = 0.003) and in the Bay of Bengal (p = 0.007). The model runs operationally every six hours on near-real-time inputs, re-predicts days
+  (p = 0.003) and in the Bay of Bengal (p = 0.007). Against an independent monthly gridded Argo analysis it has the lowest error of
+  all products (0.836 °C, versus 0.859 °C for HYCOM and 0.958 °C for GLORYS12); a per-depth uncertainty calibration fitted on 2022
+  brings the share of Argo errors inside ±1σ from 57 % to 67 % on 2023; and along all seven 2023 cyclone tracks its heat potential
+  correlates with GLORYS12 at r = 0.88. The model runs operationally every six hours on near-real-time inputs, re-predicts days
   when late inputs arrive, and feeds an Ocean Cyclone Potential Index and a language-model bulletin whose numbers are verified against the
   model output.
   <div class="keywords"><b>Keywords:</b> ocean subsurface reconstruction; deep learning; U-Net++; attention; self-supervised learning; uncertainty; North Indian Ocean; tropical cyclone heat potential; near-real-time operations</div>
@@ -405,14 +408,61 @@ of days late to the storm's cold wake, a consequence of the 15-day input window.
 </figure>
 
 <h3>4.6 Uncertainty</h3>
-<p class="noind">The predicted σ is largest in the thermocline and in the Bay of Bengal, matching where errors are largest. Calibration against Argo
-(Fig. 17) shows 57 % of errors within ±1σ, against 68 % for a perfectly calibrated Gaussian: the uncertainty is informative but about 20 %
-too small, partly because the network is trained against GLORYS12, whose own error against Argo is not part of the target. A simple variance
-scaling fitted on the validation year would correct this.</p>
+<p class="noind">The predicted σ is largest in the thermocline and in the Bay of Bengal, matching where errors are largest. Uncalibrated
+(Fig. 17), 57 % of Argo errors fall within ±1σ, against 68 % for a perfectly calibrated Gaussian: the uncertainty is informative but too
+small, partly because the network is trained against GLORYS12, whose own error against Argo is not part of the target. Section 4.7 corrects
+this with a per-depth scale fitted on the validation year.</p>
 
 <figure>
   <img src="../../web/public/figures/fig10_uncertainty_calibration.png" alt="" />
   <figcaption><b>Figure 17.</b> Uncertainty calibration: fraction of Argo errors within ±1σ and ±2σ by depth, against the 68 % and 95 % expected for a calibrated Gaussian.</figcaption>
+</figure>
+
+<h3>4.7 Independent gridded validation, calibrated uncertainty and cyclone tracks</h3>
+<p class="noind"><i>Gridded Argo.</i> As a second independent benchmark, monthly 2023 means of every product were compared with the
+Roemmich–Gilson gridded Argo analysis (1°, monthly), each product area-averaged to the analysis cells and evaluated at the standard depths
+(Table 7, Fig. 20). The Sylithe Ocean Model has the lowest error in every layer and basin: 0.836 °C over 0–1000 m against 0.859 °C for
+HYCOM and 0.958 °C for GLORYS12, and 0.235 °C below 200 m, about 31 % below both references. Because a monthly gridded analysis is
+smooth, it favours smoother fields, and part of the lead over GLORYS12 reflects this; the daily Argo comparison of Sect. 4.1 remains the
+primary score.</p>
+
+<div class="tbl">
+<table>
+  <caption><b>Table 7.</b> RMSE (°C) of monthly 2023 fields against Roemmich–Gilson gridded Argo. <span class="star">★</span> this work.</caption>
+  <thead><tr><th>Product</th><th class="n">0–1000 m</th><th class="n">200–1000 m</th><th class="n">BoB</th><th class="n">AS</th></tr></thead>
+  <tbody>
+    <tr class="ours"><td><span class="star">★</span> Sylithe Ocean Model</td><td class="n">0.836</td><td class="n">0.235</td><td class="n">0.782</td><td class="n">0.858</td></tr>
+    <tr><td>HYCOM GOFS 3.1</td><td class="n">0.859</td><td class="n">0.351</td><td class="n">0.834</td><td class="n">0.877</td></tr>
+    <tr><td>GLORYS12</td><td class="n">0.958</td><td class="n">0.341</td><td class="n">0.915</td><td class="n">0.965</td></tr>
+  </tbody>
+</table>
+</div>
+
+<figure class="wide">
+  <img src="../../web/public/figures/upg_gridded_argo.png" alt="" />
+  <figcaption><b>Figure 20.</b> Monthly 2023 fields against Roemmich–Gilson gridded Argo: (a) RMSE by depth, (b) RMSE by layer and basin.</figcaption>
+</figure>
+
+<p><i>Calibrated uncertainty.</i> For each depth, a scale \(c_z\) on σ was fitted on the 2022 Argo profiles (validation year) so that
+\(|e|/(c_z\sigma)\) has its 68.27 % quantile at one. Applied to 2023, never used for fitting, the share of Argo errors within ±1σ rises from
+56.6 % to 66.6 % (ideal 68.3 %) and within ±2σ from 87.4 % to 94.1 % (ideal 95.4 %); the largest corrections, 1.4–1.6, are in the
+thermocline (Fig. 21). The calibrated σ is used by the live system.</p>
+
+<figure class="wide">
+  <img src="../../web/public/figures/upg_calibration.png" alt="" />
+  <figcaption><b>Figure 21.</b> Uncertainty calibration fitted on 2022 Argo and tested on 2023: (a) coverage of ±1σ by depth, (b) whole column.</figcaption>
+</figure>
+
+<p><i>Cyclone tracks.</i> Every six-hourly IBTrACS position of the seven 2023 North Indian Ocean cyclones inside the domain (173 points,
+including Mocha, Biparjoy and Tej) was matched to the reconstruction of the previous day, before the storm's cold wake. Heat potential along
+the tracks correlates with GLORYS12 at r = 0.88 with a mean bias of −9.9 kJ cm⁻², concentrated under the two most intense storms (Mocha,
+Tej). The Ocean Cyclone Potential Index of Sect. 6 averaged 0.66 at the 26 points followed by rapid intensification (+30 kt in 24 h)
+against 0.54 elsewhere, an area under the ROC curve of 0.70 without any tuning of its weights (Fig. 22).</p>
+
+<figure class="wide">
+  <img src="../../web/public/figures/upg_cyclones.png" alt="" />
+  <figcaption><b>Figure 22.</b> All 2023 North Indian Ocean cyclones: (a) mean heat potential along each track, Sylithe Ocean Model and GLORYS12, with peak intensity;
+  (b) Ocean Cyclone Potential Index before rapid intensification and at other track points.</figcaption>
 </figure>
 
 <h2>5 Near-real-time operation</h2>
@@ -474,15 +524,17 @@ the strongly stratified Bay of Bengal. The β-NLL and vertical-gradient losses k
 uncertain. Finally, seed averaging and weight EMA reduce variance, which matters most for the small eddies that dominate day-to-day
 thermocline variability.</p>
 <p>Several limitations remain. The lead over the published method is small over the full column. The model learns from GLORYS12 and inherits
-part of its warm bias against Argo (about +0.2 °C). Reconstructions are smoother than the reanalysis at the smallest eddy scales, and σ is
-under-dispersed. The cyclone index weights are set from the literature rather than fitted, and should be calibrated against past best tracks
+part of its warm bias against Argo (about +0.2 °C). Reconstructions are smoother than the reanalysis at the smallest eddy scales, and heat
+potential is about 10 kJ cm⁻² low under the most intense cyclones. Equal-budget ablations with a linear probe of the self-supervised
+embedding, a near-real-time fine-tune and a thermocline-weighted fine-tune are implemented and remain to be run. The cyclone index weights are set from the literature rather than fitted, and should be calibrated against past best tracks
 (IBTrACS, IMD). Near-real-time accuracy is lower than the reprocessed evaluation until the model is fine-tuned on near-real-time inputs.</p>
 
 <h2>8 Conclusions</h2>
 <p class="noind">The Sylithe Ocean Model reconstructs daily North Indian Ocean temperature from the surface to 1000 m using only satellite
 observations, with a per-point uncertainty. On a withheld year it achieves 0.662 °C RMSE against GLORYS12 and 0.757 °C against independent Argo
 profiles, outperforming a state-of-the-art published architecture retrained on the same data — significantly so in the deep ocean and the Bay
-of Bengal — as well as statistical baselines and an operational ocean model. It runs in near real time at no infrastructure cost and supports
+of Bengal — as well as statistical baselines and an operational ocean model, and it has the lowest error against independent gridded Argo. Its
+uncertainty is calibrated, and its heat potential tracks the reanalysis along every 2023 cyclone. It runs in near real time at no infrastructure cost and supports
 cyclone-relevant diagnostics and verified language-model bulletins. Future work will fine-tune on near-real-time inputs, add salinity as a
 second output, calibrate the cyclone index against observed tracks and extend the system to marine-heatwave and fisheries applications.</p>
 

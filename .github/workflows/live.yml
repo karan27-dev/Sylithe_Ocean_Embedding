@@ -51,7 +51,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: models
-          key: ${{ env.MODELS_TAG }}
+          key: ${{ env.MODELS_TAG }}-2      # bump the suffix when files are added to a release
 
       - name: Download models from the release
         if: steps.models.outputs.cache-hit != 'true'

@@ -7,7 +7,7 @@ import { useJSON } from '../lib/data'
 const f = (v, d = 3) => (v == null || !Number.isFinite(+v) ? '—' : (+v).toFixed(d))
 const sg = (v, d = 3) => (v == null ? '—' : `${v > 0 ? '+' : ''}${(+v).toFixed(d)}`)
 
-function Block({ n, title, what, children, ready }) {
+function Block({ n, title, what, children, ready, fig }) {
   return (
     <div className="border-t border-line py-7">
       <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
@@ -15,9 +15,10 @@ function Block({ n, title, what, children, ready }) {
           <p className="label">{n}</p>
           <h3 className="mt-1 text-[16px] text-ink">{title}</h3>
           <p className="mt-2 text-[13px] leading-relaxed text-ink2">{what}</p>
-          {!ready && <p className="mt-3 inline-block rounded-[6px] bg-wash px-2 py-1 text-[11px] text-mute">Running on RunPod · results appear here automatically</p>}
+          {!ready && <p className="mt-3 inline-block rounded-[6px] bg-wash px-2 py-1 text-[11px] text-mute">Planned · code ready (oceanembed/upgrades.py), not yet run</p>}
         </div>
-        <div className="min-w-0 overflow-x-auto">{children}</div>
+        <div className="min-w-0 overflow-x-auto">{children}
+          {fig && ready && <img src={`/figures/${fig}.png`} alt={title} loading="lazy" className="mt-4 w-full rounded-[8px] border border-line bg-white" />}</div>
       </div>
     </div>
   )
@@ -40,11 +41,12 @@ export default function Upgrades() {
   return (
     <section className="pt-14">
       <SectionHead label="Finale experiments" title="Closing the remaining gaps">
-        Six experiments run after the main evaluation: independent gridded-Argo validation, ablations that isolate what the satellite
-        embedding contributes, uncertainty calibration, the near-real-time gap, the thermocline, and cyclone tracks. Same test year, same floats.
+        Experiments run after the main evaluation on the same 2023 test year: a second independent benchmark (gridded Argo), calibrated
+        uncertainty and validation along every 2023 cyclone track are complete. Ablations, the near-real-time fine-tune and the
+        thermocline fine-tune are implemented and scheduled.
       </SectionHead>
 
-      <Block n="01" title="Gridded Argo validation" ready={!!ga?.rows}
+      <Block n="01" title="Gridded Argo validation" ready={!!ga?.rows} fig="upg_gridded_argo"
         what="Monthly 2023 fields of every product against an independent gridded Argo analysis (INCOIS LAS product, or Roemmich–Gilson), area-averaged to its grid, at the 15 standard depths.">
         {ga?.rows ? (<>
           <T head={['Product', '0–1000 m', '0–200 m', '75–150 m', '200–1000 m', 'Bay of Bengal', 'Arabian Sea', 'r']}
@@ -62,7 +64,7 @@ export default function Upgrades() {
           <p className="mt-2 text-[11.5px] text-faint">RMSE °C, 2023. Positive Δ = worse without that part. {ab.budget_minutes} min of training per variant.</p></>) : null}
       </Block>
 
-      <Block n="03" title="Calibrated uncertainty" ready={cal?.inside_1sigma_after != null}
+      <Block n="03" title="Calibrated uncertainty" ready={cal?.inside_1sigma_after != null} fig="upg_calibration"
         what="A per-depth scale on σ, fitted on 2022 Argo only, so that ±1σ covers 68 % of real errors. Checked on 2023, never used for fitting.">
         {cal?.inside_1sigma_after != null ? (
           <T head={['', 'Before', 'After', 'Ideal']} rows={[
@@ -88,7 +90,7 @@ export default function Upgrades() {
           <p className="mt-2 text-[11.5px] text-faint">{th.adopted ? 'Adopted: the thermocline improved and the whole column did not get worse.' : 'Not adopted: it did not improve the thermocline without a cost elsewhere.'}</p></>) : null}
       </Block>
 
-      <Block n="06" title="Along the 2023 cyclone tracks" ready={!!cy?.storms}
+      <Block n="06" title="Along the 2023 cyclone tracks" ready={!!cy?.storms} fig="upg_cyclones"
         what="Every 6-hourly IBTrACS position of the 2023 North Indian Ocean cyclones. The ocean is sampled the day before the storm reaches it: heat potential against GLORYS12, and whether the Ocean Cyclone Potential Index was higher before rapid intensification (+30 kt in 24 h).">
         {cy?.storms ? (<>
           <T head={['Storm', 'Track points', 'Max wind (kt)', 'TCHP ours', 'TCHP GLORYS12', 'OCPI', 'RI points']}

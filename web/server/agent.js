@@ -55,7 +55,14 @@ SYLITHE OCEAN MODEL (SIH 2026, problem statement 26066, MoES / INCOIS)
   Published Attention 3D U-Net++ (Wang et al., ESSD 2026) retrained on the same data: 0.668 / 0.762. Ridge 0.740 / 0.804.
   HYCOM 1.193 / 0.806. Climatology 1.119 / 0.952. GLORYS12 itself vs Argo 0.684 (it assimilates Argo).
   Lead over the published method is significant below 200 m and in the Bay of Bengal; small over the whole column.
-  Uncertainty: 57 % of Argo errors inside ±1σ (68 % ideal), so σ is about 20 % too small. Largest errors 75–150 m (thermocline).
+  Uncertainty: raw σ had 57 % of Argo errors inside ±1σ; after a per-depth scale fitted on 2022 Argo it is 66.6 % inside ±1σ
+  and 94.1 % inside ±2σ on 2023 (ideal 68.3 / 95.4). Largest errors 75–150 m (thermocline).
+- Gridded Argo (Roemmich–Gilson, monthly 2023, 1°): RMSE 0–1000 m Sylithe 0.836, HYCOM 0.859, GLORYS12 0.958 °C;
+  200–1000 m 0.235 vs 0.351 / 0.341; Bay of Bengal 0.782 vs 0.834 / 0.915; Arabian Sea 0.858 vs 0.877 / 0.965
+  (smooth monthly fields favour smoother products).
+- 2023 cyclones (IBTrACS, 7 storms incl. Mocha, Biparjoy, Tej, Hamoon, Michaung, Midhili; 173 track points): TCHP along tracks
+  vs GLORYS12 r = 0.88, bias −9.9 kJ cm⁻² (low for Mocha and Tej); OCPI before rapid intensification 0.66 vs 0.54, AUC 0.70.
+- Planned (code ready, not run): ablations and an SSL-embedding linear probe, near-real-time fine-tune, thermocline-weighted fine-tune.
 - Live system: GitHub Actions every 6 h ingests near-real-time satellite data, predicts every day whose SST and sea level are in,
   re-predicts recent days (revision +1) when late salinity (~6 days) or winds (~1 day) arrive, checks against Argo
   (first month about 1.05 °C RMSE, worse than 2023 because of near-real-time substitute inputs).

@@ -117,6 +117,30 @@ Paired bootstrap over Argo profiles (2,000 resamples; all depths of a profile re
 **In short:** Sylithe beats every method except GLORYS12 itself (which ingests the very Argo floats used for scoring). Against the
 published state-of-the-art architecture, the advantage is statistically significant in the deep ocean and in the Bay of Bengal.
 
+### Independent checks added for the finale
+
+**Second independent benchmark: gridded Argo** (Roemmich–Gilson, monthly 2023, 1°). Sylithe has the lowest error of all three products, including GLORYS12, its own training target:
+
+| Product | 0–1000 m | 0–200 m | 200–1000 m | Bay of Bengal | Arabian Sea |
+|---|---:|---:|---:|---:|---:|
+| ★ **Sylithe Ocean Model** | **0.836** | **0.974** | **0.235** | **0.782** | **0.858** |
+| HYCOM GOFS 3.1 | 0.859 | 0.992 | 0.351 | 0.834 | 0.877 |
+| GLORYS12 | 0.958 | 1.110 | 0.341 | 0.915 | 0.965 |
+
+<sub>RMSE °C. Monthly gridded fields are smooth, which favours smoother products; the daily Argo comparison above remains the primary score.</sub>
+
+![Gridded Argo](web/public/figures/upg_gridded_argo.png)
+
+**Calibrated uncertainty.** A per-depth σ scale fitted on 2022 Argo only, tested on 2023: errors inside ±1σ **56.6 % → 66.6 %** (ideal 68.3 %), inside ±2σ **87.4 % → 94.1 %** (ideal 95.4 %).
+
+![Calibration](web/public/figures/upg_calibration.png)
+
+**Every 2023 cyclone, along its IBTrACS track** (Mocha, Biparjoy, Tej, Hamoon, Michaung, Midhili and one unnamed system; 173 six-hourly points, ocean sampled the day before): heat potential vs GLORYS12 **r = 0.88** (bias −9.9 kJ cm⁻², mostly Mocha and Tej); the Ocean Cyclone Potential Index averaged **0.66 before rapid intensification vs 0.54 otherwise, AUC 0.70**.
+
+![Cyclones](web/public/figures/upg_cyclones.png)
+
+Planned with code ready (`oceanembed/upgrades.py`, `scripts/runpod_upgrades.sh`): equal-budget ablations with a linear probe of the self-supervised embedding, a near-real-time fine-tune and a thermocline-weighted fine-tune.
+
 ### Evaluation figures
 
 <table>
@@ -492,7 +516,8 @@ Full reference: the **Docs** page of the console.
 **Honest limitations**
 - Over the whole column, the lead over the published architecture is small (not significant); it is significant below 200 m and in the Bay of Bengal.
 - The model inherits part of the GLORYS12 bias (≈ +0.2 °C against Argo) and is smoother than the reanalysis at the smallest eddy scales.
-- σ is about 20 % too small.
+- σ needed calibration: raw ±1σ covered 57 % of Argo errors; a per-depth scale fitted on 2022 brings it to 66.6 % on 2023.
+- Heat potential is about 10 kJ cm⁻² low under the most intense 2023 cyclones (Mocha, Tej).
 - Live inputs are near-real-time substitutes; live RMSE is higher than on reprocessed 2023.
 - The cyclone index is ocean-only: no shear, humidity or track forecast.
 
