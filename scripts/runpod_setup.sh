@@ -25,9 +25,16 @@ fi
 
 echo "== training data from Google Drive"
 if [ ! -d "$DATA/inputs.zarr" ] || [ ! -d "$DATA/target.zarr" ]; then
-  # pack.tar = the stores in big time-chunks (made in Colab by oceanembed.pack); restore one chunk per day here
-  rclone copy -P "gdrive:$DRIVE_DIR/pack.tar" "$DATA/"
-  python -m oceanembed.pack unpack --tar "$DATA/pack.tar" --dst "$DATA" && rm "$DATA/pack.tar"
+  # pack.tar = the stores in big time-chunks (made in Colab by oceanembed.pack); restore one chunk per day here.
+  # Google Drive rate-limits now and then: retry the copy until the full file is there.
+  for i in 1 2 3 4 5; do
+    rclone copy -P --retries 10 --low-level-retries 20 "gdrive:$DRIVE_DIR/pack.tar" "$DATA/" && break
+    echo "copy attempt $i failed, retrying in 30 s"; sleep 30
+  done
+  [ -f "$DATA/pack.tar" ] || { echo "pack.tar did not arrive from Drive"; exit 1; }
+  ( cd "$(dirname "$0")/.." && python -m oceanembed.pack unpack --tar "$DATA/pack.tar" --dst "$DATA" ) \
+    || { echo "unpack failed"; exit 1; }
+  rm -f "$DATA/pack.tar"
 fi
 
 echo "== validation data (HYCOM comparator, Argo profiles)"
