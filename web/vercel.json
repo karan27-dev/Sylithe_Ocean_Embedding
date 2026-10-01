@@ -3,9 +3,39 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "framework": "vite",
-  "rewrites": [{ "source": "/((?!data/|assets/|api/).*)", "destination": "/index.html" }],
+  "rewrites": [
+    {
+      "source": "/live/:path*",
+      "destination": "/api/live?path=:path*"
+    },
+    {
+      "source": "/((?!data/|assets/|api/|live/).*)",
+      "destination": "/index.html"
+    }
+  ],
   "headers": [
-    { "source": "/assets/(.*)", "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }] },
-    { "source": "/data/(.*)", "headers": [{ "key": "Cache-Control", "value": "public, max-age=3600" }] }
-  ]
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/data/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600"
+        }
+      ]
+    }
+  ],
+  "git": {
+    "deploymentEnabled": {
+      "live-data": false
+    }
+  }
 }

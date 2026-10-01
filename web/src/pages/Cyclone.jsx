@@ -14,7 +14,7 @@ import { level, useDay, useJSON, useManifest } from '../lib/data'
 import { DEPTHS, REGIONS, derived, fmt, fmtDate, fmtLat, fmtLon, layerGrid, robustRange } from '../lib/ocean'
 import { CATS, RULES, VORT, WIND, catOf, drivers, features, ocpiOfRecord, peaks, regionSummary, t100, untraced } from '../lib/cyclone'
 
-const LIVE = import.meta.env.VITE_LIVE_BASE || 'https://raw.githubusercontent.com/karan27-dev/Sylithe_Ocean_Embedding/live-data/web'
+const LIVE = import.meta.env.VITE_LIVE_BASE || '/live'
 const REPLAY = '/data/ops'
 const RCOL = { BoB: '#2F6F6A', AS: '#C29A55', NIO: '#0F172A' }
 const RS = ['BoB', 'AS', 'NIO']

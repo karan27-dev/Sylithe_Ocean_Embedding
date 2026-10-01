@@ -14,7 +14,7 @@ import { areaKm2, downloadCsv, maskFor, polygon, presetAoi, readAoiFiles, rectan
 
 const REPLAY = '/data/ops'
 // Live feed: the `live-data` branch written by .github/workflows/live.yml (override with VITE_LIVE_BASE)
-const LIVE = import.meta.env.VITE_LIVE_BASE || 'https://raw.githubusercontent.com/karan27-dev/Sylithe_Ocean_Embedding/live-data/web'
+const LIVE = import.meta.env.VITE_LIVE_BASE || '/live'
 const ago = (iso) => {
   const h = (Date.now() - Date.parse(iso)) / 36e5
   return h < 1 ? `${Math.round(h * 60)} min ago` : h < 48 ? `${Math.round(h)} h ago` : `${Math.round(h / 24)} days ago`

@@ -9,9 +9,9 @@ const once = (key, fn) => {
   return cache.get(key)
 }
 
-// Live files (raw.githubusercontent.com) are cached for 5 minutes by GitHub and by the browser; a key that changes
+// Live files (/live/…, proxied from the private live-data branch) are cached for 5 minutes by GitHub and by the browser; a key that changes
 // every 5 minutes makes each visit read the newest run while repeated loads within a session stay cached.
-const fresh = (url) => (/^https?:/.test(url) ? `${url}${url.includes('?') ? '&' : '?'}v=${Math.floor(Date.now() / 300000)}` : url)
+const fresh = (url) => (/^(https?:|\/live\/)/.test(url) ? `${url}${url.includes('?') ? '&' : '?'}v=${Math.floor(Date.now() / 300000)}` : url)
 
 export const loadManifest = (base = BASE) =>
   once(`manifest:${base}`, async () => {

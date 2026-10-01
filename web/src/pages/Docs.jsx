@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { Check, Copy, Search } from 'lucide-react'
 
 const REPO = 'https://github.com/karan27-dev/Sylithe_Ocean_Embedding'
-const LIVE = 'https://raw.githubusercontent.com/karan27-dev/Sylithe_Ocean_Embedding/live-data/web'
+const LIVE = 'https://sylithe-ocean-model.vercel.app/live'
 
 const NAV = [
   ['Getting started', [['intro', 'Introduction'], ['quickstart', 'Quickstart'], ['install', 'Installation']]],

@@ -76,6 +76,7 @@ jobs:
       - name: Publish to the live-data branch
         run: |
           cd state
+          printf '{"git":{"deploymentEnabled":false}}\n' > vercel.json   # data only: Vercel must not build this branch
           git init -q -b live-data
           git config user.name "sylithe-live[bot]"
           git config user.email "sylithe-live@users.noreply.github.com"

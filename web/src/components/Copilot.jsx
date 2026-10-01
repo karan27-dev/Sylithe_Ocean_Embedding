@@ -9,7 +9,7 @@ import { DEPTHS, LAYERS, cellAt, column, fmt, fmtDate, fmtLat, fmtLon, isothermD
 // Sylithe agent. Map commands ("temperature at 150 m", "probe 88E 15N") act on the console directly, computed from the
 // loaded fields. Questions go to /api/agent (DeepSeek on the server), grounded in the model facts and the live context
 // sent with them: status, Argo check, leaderboard and today's cyclone numbers.
-const LIVE = import.meta.env.VITE_LIVE_BASE || 'https://raw.githubusercontent.com/karan27-dev/Sylithe_Ocean_Embedding/live-data/web'
+const LIVE = import.meta.env.VITE_LIVE_BASE || '/live'
 const QUESTION = /\?|^(what|why|how|which|where|when|who|is|are|does|do|can|could|should|explain|compare|tell|summar|describe|give)\b/i
 
 const PAGES = { explorer: '/explorer', map: '/explorer', embedding: '/embedding', latent: '/embedding', validation: '/validation',
