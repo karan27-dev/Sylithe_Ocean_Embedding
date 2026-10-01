@@ -18,6 +18,8 @@ REPO=/workspace/Sylithe_Ocean_Embedding
 OUT=/workspace/OceanEmbed
 DATA=/workspace/data
 SRC=gdrive:OceanEmbed/runpod_results
+# Drive rate-limits rclone's shared app: go gently and retry
+RC="--tpslimit 6 --retries 10 --low-level-retries 30"
 DEST=gdrive:OceanEmbed/runpod_results/upgrades
 MINUTES=${MINUTES:-40}
 cd "$REPO" || exit 1
@@ -25,12 +27,15 @@ pip install -q copernicusmarine pyarrow netCDF4
 
 echo "== trained models, statistics and the 2023 ensemble from Drive"
 mkdir -p "$OUT"
-rclone copy "$SRC" "$OUT" --include "stats_v2.npz" --include "OceanEmbed_NIO_T_2023.nc" \
+rclone copy $RC "$SRC" "$OUT" --include "stats_v2.npz" --include "OceanEmbed_NIO_T_2023.nc" \
   --include "checkpoints/oceanembed_w15/seed*/glorys_best.pt" --include "checkpoints/oceanembed_w15/ssl_best.pt" -P
+n=$(ls "$OUT"/checkpoints/oceanembed_w15/seed*/glorys_best.pt 2>/dev/null | wc -l)
+[ -f "$OUT/stats_v2.npz" ] && [ "$n" -ge 1 ] || { echo "models/statistics did not arrive from Drive (rate limit?): re-run this script"; exit 1; }
+echo "models: $n members"
 
-save() { rclone copy "$OUT/upgrades" "$DEST" --exclude "release_models/**" -q
-         rclone copy "$OUT/upgrades/release_models" "$DEST/release_models" -q 2>/dev/null
-         rclone copy "$OUT/checkpoints" "$DEST/checkpoints" --include "*_best.pt" --include "*_log.csv" -q; }
+save() { rclone copy $RC "$OUT/upgrades" "$DEST" --exclude "release_models/**" -q
+         rclone copy $RC "$OUT/upgrades/release_models" "$DEST/release_models" -q 2>/dev/null
+         rclone copy $RC "$OUT/checkpoints" "$DEST/checkpoints" --include "*_best.pt" --include "*_log.csv" -q; }
 ( while true; do sleep 600; save; done ) & SAVER=$!
 
 python -m oceanembed.upgrades all --data "$DATA" --root "$OUT" --minutes "$MINUTES" \
