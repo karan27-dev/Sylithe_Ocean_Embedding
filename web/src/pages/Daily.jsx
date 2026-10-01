@@ -277,6 +277,7 @@ export default function Daily() {
               <p className="num mt-2 text-[11px] text-mute">{all.length} days predicted · {fmtDate(all[0])} – {fmtDate(all[all.length - 1])}</p>
               {run && <p className="num mt-1 text-[11px] text-mute">{run.members}-model ensemble · {run.window}-day window · {run.revision ? `update ${run.revision}` : 'first prediction'}
                 {run.computed_at && ` · ${run.computed_at.replace('T', ' ').slice(0, 16)} UTC`}</p>}
+              {run?.provisional && <p className="mt-1.5 rounded-[6px] border border-[#E9D3A6] bg-[#FBF4E4] px-2 py-1 text-[11px] text-[#8A5A12]">Provisional: SST for this day has not been published yet, so the model used SST from {fmtDate(run.sst_from)}. It is predicted again automatically when the real SST arrives.</p>}
             </Side>
 
             <Side n={3} title="Area of interest" aside={areaLabel}>

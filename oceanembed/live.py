@@ -63,6 +63,9 @@ INPUT_DAYS = 60                # inputs kept (≥ window + revision horizon)
 MAP_DAYS = 31                  # days with full maps on the site
 REVISE_DAYS = 21               # how far back an improved input triggers a re-prediction
 BOOTSTRAP_DAYS = 45            # first run: how far back to ingest
+SST_CARRY_DAYS = 3             # SST (OSTIA NRT) lags 1–2 days: carry the newest SST forward this far so the newest
+                               # sea-level day can be predicted now; such days are provisional and re-predicted when
+                               # the real SST lands (it raises the input signature)
 
 
 def _now():
@@ -216,18 +219,37 @@ def backfill_inputs(state: State, today: str, days: int, window: int, log=print,
         log(f"  backfill {LABEL[did]}: {n} day(s) added back to {want_from}")
 
 
+def carried_sst(state: State, day: str):
+    """(field, source_day) of the newest stored SST on or before `day`, at most SST_CARRY_DAYS old; None if none."""
+    for k in range(0, SST_CARRY_DAYS + 1):
+        d = str((pd.Timestamp(day) - pd.Timedelta(days=k)).date())
+        f = state.inputs(d).get("sst")
+        if f is not None:
+            return f, d
+    return None
+
+
+def inputs_for(state: State, day: str) -> tuple[dict, str | None]:
+    """Stored inputs of a day, with SST carried forward when it has not arrived yet. Returns (fields, sst_source_day)."""
+    inp = state.inputs(day)
+    if "sst" in inp:
+        return inp, None
+    c = carried_sst(state, day)
+    return (inp | {"sst": c[0]}, c[1]) if c else (inp, None)
+
+
 def _build_store(state: State, path: str, start: str, end: str):
     ingest.init_store(path, C.INPUT_VARS, with_depth=False, start=start, end=end)
     days = _dates(start, end)
     for v in C.INPUT_VARS:
-        a = np.stack([state.inputs(d).get(v, np.full((len(C.LATS), len(C.LONS)), np.nan, "f4")) for d in days])
+        a = np.stack([inputs_for(state, d)[0].get(v, np.full((len(C.LATS), len(C.LONS)), np.nan, "f4")) for d in days])
         ingest.write_block(path, xr.DataArray(a, dims=["time", "lat", "lon"],
                                               coords={"time": pd.to_datetime(days), "lat": C.LATS, "lon": C.LONS}), v)
 
 
 def predict_new(state: State, members, window: int, S, today: str, log=print):
     """Predict new days and re-predict recent days whose inputs improved. Returns the days (re)computed."""
-    ready = [d for d in state.stored_days() if all(k in state.inputs(d) for k in CORE)]
+    ready = [d for d in state.stored_days() if all(k in inputs_for(state, d)[0] for k in CORE)]
     first = state.stored_days()[0] if state.stored_days() else None
     if not ready or first is None:
         return []
@@ -261,7 +283,8 @@ def predict_new(state: State, members, window: int, S, today: str, log=print):
         np.savez_compressed(os.path.join(state.root, "pred", f"{d}.npz"),
                             temp=np.where(np.isfinite(T), np.round((T - 20) * 1000), -32768).astype("i2"),
                             sigma=np.where(np.isfinite(Sg), np.round(Sg * 1000), -32768).astype("i2"))
-        inp = state.inputs(d)
+        raw = state.inputs(d)
+        inp, sst_from = inputs_for(state, d)
         fields = {v: np.where(ocean, inp.get(v, np.full(ocean.shape, np.nan, "f4")), np.nan) for v in C.INPUT_VARS}
         state.series["days"][d] = _region_stats(T, Sg, fields, masks)
         prev = state.index.get(d, {})
@@ -269,7 +292,8 @@ def predict_new(state: State, members, window: int, S, today: str, log=print):
         state.index[d] = {
             "computed_at": stamp, "revision": prev.get("revision", -1) + 1, "signature": sig,
             "members": len(members), "window": window,
-            "inputs_today": sorted(inp), "missing_today": [v for v in C.INPUT_VARS if v not in inp],
+            "inputs_today": sorted(raw), "missing_today": [v for v in C.INPUT_VARS if v not in raw],
+            "provisional": sst_from is not None, "sst_from": sst_from,
             "inputs_valid": {v: round(float(np.isfinite(fields[v][ocean]).mean()), 3) for v in C.INPUT_VARS},
             "window_coverage": round(sig / (len(C.INPUT_VARS) * len(window_days)), 3),
             "sources": "near-real-time",
