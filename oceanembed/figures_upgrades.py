@@ -35,13 +35,19 @@ def gridded(d, out):
         a.plot(v, z, "-o", ms=3, lw=1.8 if r["product"].startswith("Sylithe") else 1.2, color=COL.get(r["product"], GREY), label=r["product"])
     _depth_axis(a); a.set_xlabel("RMSE (°C)"); a.set_title("(a) RMSE by depth"); a.legend(frameon=False, fontsize=8)
     bands = ["0–1000 m", "0–200 m", "75–150 m", "200–1000 m", "Bay of Bengal", "Arabian Sea"]
-    x = np.arange(len(bands)); w = 0.26
+    x = np.arange(len(bands)); w = 0.27
+    top = 0
     for i, r in enumerate(rows):
         vals = [r.get(k) or np.nan for k in bands]
+        ours = r["product"].startswith("Sylithe")
         bars = b.bar(x + (i - 1) * w, vals, w, color=COL.get(r["product"], GREY), label=r["product"])
-        if r["product"].startswith("Sylithe"):
-            for bb, v in zip(bars, vals):
-                b.text(bb.get_x() + bb.get_width() / 2, v + 0.02, f"{v:.2f}", ha="center", fontsize=7, color=OURS)
+        for bb, v in zip(bars, vals):                      # every bar labelled, upright, just above its own top
+            if np.isfinite(v):
+                b.text(bb.get_x() + bb.get_width() / 2, v + 0.015, f"{v:.2f}", ha="center", va="bottom", rotation=90,
+                       fontsize=7, color=OURS if ours else "#334155", fontweight="bold" if ours else "normal")
+                top = max(top, v)
+    b.set_ylim(0, top * 1.18)
+    b.legend(frameon=False, fontsize=7.5, loc="upper right")
     b.set_xticks(x, bands, rotation=20, ha="right"); b.set_ylabel("RMSE (°C)"); b.set_title("(b) RMSE by layer and basin")
     b.grid(axis="y", alpha=0.25, linestyle=":")
     fig.suptitle(f"Monthly 2023 fields against gridded Argo ({d['source']}, {d['grid']} grid)", fontsize=10.5)
