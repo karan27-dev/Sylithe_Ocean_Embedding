@@ -27,8 +27,11 @@ pip install -q copernicusmarine pyarrow netCDF4
 
 echo "== trained models, statistics and the 2023 ensemble from Drive"
 mkdir -p "$OUT"
-rclone copy $RC "$SRC" "$OUT" --include "stats_v2.npz" --include "OceanEmbed_NIO_T_2023.nc" \
-  --include "checkpoints/oceanembed_w15/seed*/glorys_best.pt" --include "checkpoints/oceanembed_w15/ssl_best.pt" -P
+# exact file list: a filtered copy would list the whole results folder, which Drive's rate limit makes very slow
+printf '%s\n' stats_v2.npz OceanEmbed_NIO_T_2023.nc checkpoints/oceanembed_w15/ssl_best.pt \
+  checkpoints/oceanembed_w15/seed42/glorys_best.pt checkpoints/oceanembed_w15/seed7/glorys_best.pt \
+  checkpoints/oceanembed_w15/seed1234/glorys_best.pt > /tmp/models.txt
+rclone copy $RC --files-from /tmp/models.txt --no-traverse "$SRC" "$OUT" -P
 n=$(ls "$OUT"/checkpoints/oceanembed_w15/seed*/glorys_best.pt 2>/dev/null | wc -l)
 [ -f "$OUT/stats_v2.npz" ] && [ "$n" -ge 1 ] || { echo "models/statistics did not arrive from Drive (rate limit?): re-run this script"; exit 1; }
 echo "models: $n members"
