@@ -39,7 +39,7 @@ from . import train as TR
 
 BANDS = {"0–1000 m": (0, 1000), "0–200 m": (0, 200), "75–150 m": (75, 150), "200–1000 m": (201, 1000)}
 IBTRACS = "https://www.ncei.noaa.gov/data/international-best-track-archive-for-climate-stewardship-ibtracs/v04r01/access/csv/ibtracs.NI.list.v04r01.csv"
-RG = "https://sio-argo.ucsd.edu/gilson/argo_climatology/"
+RG = "https://sio-argo.ucsd.edu/RG/"
 
 
 def _r(v, d=3):
