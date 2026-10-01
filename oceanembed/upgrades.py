@@ -235,7 +235,9 @@ class Up:
             "tchp_r_vs_glorys": _r(np.corrcoef(df.tchp, df.tchp_glorys)[0, 1], 3),
             "ri_points": len(ri), "ocpi_mean_before_ri": _r(ri.ocpi.mean(), 3) if len(ri) else None,
             "ocpi_mean_otherwise": _r(non.ocpi.mean(), 3) if len(non) else None, "ocpi_auc_ri": auc,
-            "note": "Ocean sampled the day before each 6-hourly track point; rapid intensification = +30 kt in 24 h."})
+            "note": "Ocean sampled the day before each 6-hourly track point; rapid intensification = +30 kt in 24 h.",
+            "points": [{"storm": r.storm, "t": r.t, "wind": r.wind, "dw24": _r(r.dw24, 0), "tchp": _r(r.tchp, 1),
+                        "tchp_glorys": _r(r.tchp_glorys, 1), "ocpi": _r(r.ocpi, 3)} for r in df.itertuples()]})
 
     # ---------------------------------------------------------------- 3 · gridded Argo (INCOIS LAS or Roemmich–Gilson)
     def _gridded_files(self):
@@ -474,7 +476,7 @@ class Up:
 
     # ---------------------------------------------------------------- report
     def report(self):
-        out = {"generated_at": pd.Timestamp.utcnow().isoformat(timespec="seconds")}
+        out = {"generated_at": pd.Timestamp.now("UTC").isoformat(timespec="seconds")}
         for n in ("calibration", "cyclones", "gridded_argo", "thermocline", "ablation", "nrt"):
             p = self.path(f"{n}.json")
             if os.path.exists(p):
