@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { SectionHead } from '../components/ui'
 import { useJSON } from '../lib/data'
+import Upgrades from '../components/Upgrades'
 
 const F = (name) => `/figures/${name}.png`
 
@@ -219,6 +220,8 @@ export default function Research() {
           </div>
         </section>
       ))}
+
+      <Upgrades />
 
       {/* comparison */}
       <section className="pt-14">

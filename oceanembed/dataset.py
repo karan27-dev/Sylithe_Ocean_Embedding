@@ -143,6 +143,12 @@ class SurfaceWindows(Dataset):
         self.time = pd.DatetimeIndex(ds.time.values)
         self.inp = _load_inputs(inputs_path, stats)
         self.T = _load_target(target_path) if need_target else None
+        self.toff = 0
+        if need_target:                                       # target row of input day t is t + toff
+            tt = pd.DatetimeIndex(xr.open_zarr(target_path).time.values)
+            self.toff = int(tt.searchsorted(self.time[0]))
+            if self.toff >= len(tt) or tt[self.toff] != self.time[0]:
+                raise ValueError("the input store starts on a day the target store does not hold")
         # searchsorted (not get_loc) so the same class works on the monthly stores of the Argo stage
         t0 = int(self.time.searchsorted(pd.Timestamp(period[0])))
         t1 = int(self.time.searchsorted(pd.Timestamp(period[1]), side="right")) - 1
@@ -197,7 +203,7 @@ class SurfaceWindows(Dataset):
         if self.T is not None:
             clim = self.S["clim"][doy - 1]
             raw, scale, offset, fill = self.T
-            enc = raw[t]
+            enc = raw[t + self.toff]
             Tt = enc.astype("f4") * np.float32(scale) + np.float32(offset) if raw.dtype.kind == "i" else enc.astype("f4")
             if fill is not None:
                 Tt[enc == fill] = np.nan

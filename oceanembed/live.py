@@ -247,7 +247,7 @@ def _build_store(state: State, path: str, start: str, end: str):
                                               coords={"time": pd.to_datetime(days), "lat": C.LATS, "lon": C.LONS}), v)
 
 
-def predict_new(state: State, members, window: int, S, today: str, log=print):
+def predict_new(state: State, members, window: int, S, today: str, log=print, sigma_scale=None):
     """Predict new days and re-predict recent days whose inputs improved. Returns the days (re)computed."""
     ready = [d for d in state.stored_days() if all(k in inputs_for(state, d)[0] for k in CORE)]
     first = state.stored_days()[0] if state.stored_days() else None
@@ -272,7 +272,7 @@ def predict_new(state: State, members, window: int, S, today: str, log=print):
         path = os.path.join(tmp, "inputs.zarr")
         _build_store(state, path, str((pd.Timestamp(a) - pd.Timedelta(days=window - 1)).date()), b)
         D._INPUT_CACHE.clear()
-        rec = I.reconstruct(members, path, S, a, b, window=window)
+        rec = I.reconstruct(members, path, S, a, b, window=window, sigma_scale=sigma_scale)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     ocean = S["ocean"] > 0
@@ -397,7 +397,11 @@ def run(state_dir: str, models_dir: str, stats_path: str | None = None, today: s
     sources = ingest_new(state, today, log, fetch_fn, latest_fn)
     if backfill > 0:
         backfill_inputs(state, today, backfill, window, log, fetch_fn)
-    done = predict_new(state, members, window, S, today, log)
+    cal = os.path.join(models_dir, "sigma_scale.json")       # σ calibration (oceanembed.upgrades calibrate), optional
+    sigma_scale = json.load(open(cal))["scale"] if os.path.exists(cal) else None
+    if sigma_scale:
+        log("  σ calibration: on")
+    done = predict_new(state, members, window, S, today, log, sigma_scale=sigma_scale)
     skill = argo_check(state, today, log=log) if argo else None
     if skill is not None:
         _save_json(os.path.join(state.root, "skill.json"), skill)

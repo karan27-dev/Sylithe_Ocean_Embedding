@@ -19,7 +19,7 @@ from torch.utils.data import DataLoader
 
 from . import config as C
 from .dataset import unpad, worker_init
-from .losses import gaussian_nll, masked_mean, surface_consistency, vertical_gradient
+from .losses import depth_weights, gaussian_nll, masked_mean, surface_consistency, vertical_gradient
 from .metrics import skill
 from .model import SurfaceMAE, build
 
@@ -46,7 +46,8 @@ def _physical(mean, b, depth_std):
 def step_loss(model, b, cfg, depth_std):
     mean, logvar, _ = model(b["x"], b["missing"], b["static"])
     m = b["m"]
-    loss = gaussian_nll(mean, logvar, b["y"], m, beta=cfg.beta_nll)
+    alpha = (cfg.extra or {}).get("depth_weight", 0.0)
+    loss = gaussian_nll(mean, logvar, b["y"], m, beta=cfg.beta_nll, w=depth_weights(alpha) if alpha else None)
     T_pred = _physical(mean, b, depth_std)
     if cfg.w_vgrad:
         loss = loss + cfg.w_vgrad * vertical_gradient(T_pred, b["Ttrue"], m)

@@ -65,8 +65,9 @@ class ConvBlock(nn.Module):
 
 # ------------------------------------------------------------------ embedding engine
 class SurfaceEncoder(nn.Module):
-    def __init__(self, n_vars=N_IN, base=32, levels=4, embed_dim=64):
+    def __init__(self, n_vars=N_IN, base=32, levels=4, embed_dim=64, temporal_attention=True):
         super().__init__()
+        self.temporal_attention = temporal_attention                      # False = plain mean over the window (ablation)
         self.stem = nn.Sequential(
             nn.Conv3d(n_vars * 2, base, 3, padding=1), nn.GELU(),          # values + missing-flags
             nn.Conv3d(base, base, 3, padding=1), nn.GELU())
@@ -81,7 +82,7 @@ class SurfaceEncoder(nn.Module):
         """x, missing: (B, V, T, H, W); static: (B, N_STATIC, H, W).
         Returns multiscale features [X00, X10, ...] and the compact embedding z."""
         h = self.stem(torch.cat([x, missing], 1))                           # (B, base, T, H, W)
-        w = torch.softmax(self.t_score(h), dim=2)
+        w = torch.softmax(self.t_score(h), dim=2) if self.temporal_attention else torch.full_like(h[:, :1], 1.0 / h.shape[2])
         h = (h * w).sum(2)                                                  # (B, base, H, W)
         feats = [self.fuse(torch.cat([h, static], 1))]
         for d in self.downs:
@@ -122,9 +123,9 @@ class NestedDecoder(nn.Module):
 class OceanEmbedNet(nn.Module):
     """Surface window → embedding → 15-level temperature anomaly (mean, log-variance)."""
 
-    def __init__(self, base=32, levels=4, embed_dim=64):
+    def __init__(self, base=32, levels=4, embed_dim=64, temporal_attention=True):
         super().__init__()
-        self.encoder = SurfaceEncoder(base=base, levels=levels, embed_dim=embed_dim)
+        self.encoder = SurfaceEncoder(base=base, levels=levels, embed_dim=embed_dim, temporal_attention=temporal_attention)
         self.decoder = NestedDecoder(self.encoder.chs, 2 * N_DEPTH)
 
     def forward(self, x, missing, static):
@@ -171,9 +172,32 @@ class AttnUNetPP3D(nn.Module):
         return out[:, 0], out[:, 1].clamp(-8, 6), None
 
 
+class LinearProbe(nn.Module):
+    """Embedding probe: a frozen encoder and ONE linear layer from the 64-d embedding z (1/8 resolution) to the
+    15-level temperature anomaly, upsampled back to the grid. If z from self-supervised pretraining alone (no
+    subsurface label ever seen) predicts the subsurface far better than z from a random encoder, the embedding
+    itself carries the subsurface signal."""
+
+    def __init__(self, base=32, levels=4, embed_dim=64):
+        super().__init__()
+        self.encoder = SurfaceEncoder(base=base, levels=levels, embed_dim=embed_dim)
+        self.head = nn.Conv2d(embed_dim, N_DEPTH, 1)
+        for p in self.encoder.parameters():
+            p.requires_grad_(False)
+
+    def forward(self, x, missing, static):
+        with torch.no_grad():
+            _, z = self.encoder(x, missing, static)
+        mean = F.interpolate(self.head(z), size=x.shape[-2:], mode="bilinear", align_corners=False)
+        return mean, torch.zeros_like(mean), z
+
+
 def build(arch: str, cfg) -> nn.Module:
+    extra = getattr(cfg, "extra", None) or {}
     if arch == "embed_unetpp2d":
-        return OceanEmbedNet(base=cfg.base, levels=cfg.levels)
+        return OceanEmbedNet(base=cfg.base, levels=cfg.levels, temporal_attention=not extra.get("no_tattn"))
+    if arch == "probe":
+        return LinearProbe(base=cfg.base, levels=cfg.levels)
     if arch == "attn_unetpp3d":
         return AttnUNetPP3D(base=max(cfg.base // 2, 8), levels=cfg.levels, window=cfg.window)
     raise ValueError(arch)

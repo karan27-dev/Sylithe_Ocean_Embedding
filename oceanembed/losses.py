@@ -15,13 +15,23 @@ def masked_mean(x, m):
     return (x * m).sum() / m.sum().clamp_min(1)
 
 
-def gaussian_nll(mean, logvar, y, m, beta: float = 0.5):
+def depth_weights(alpha: float, centre: float = 110.0, width: float = 55.0):
+    """(15,) weights 1 + α·exp(−((z − centre)/width)²), renormalised to mean 1: extra weight on the thermocline
+    (75–150 m), where the remaining error is, without changing the overall loss scale."""
+    z = torch.tensor(DEPTHS, dtype=torch.float32)
+    w = 1 + alpha * torch.exp(-((z - centre) / width) ** 2)
+    return w / w.mean()
+
+
+def gaussian_nll(mean, logvar, y, m, beta: float = 0.5, w=None):
     """Heteroscedastic β-NLL (Seitzer et al., ICLR 2022): learns a per-pixel, per-depth uncertainty
     alongside the value. Plain NLL (β=0) lets the network down-weight hard pixels by inflating their
     variance, which hurts RMSE; weighting each term by σ^(2β) (no gradient) removes that, β=1 ≈ MSE."""
     nll = 0.5 * (logvar + (y - mean) ** 2 * torch.exp(-logvar))
     if beta:
         nll = nll * torch.exp(logvar).detach() ** beta
+    if w is not None:
+        nll = nll * w.to(nll.device).view(1, -1, 1, 1)
     return masked_mean(nll, m)
 
 

@@ -19,6 +19,11 @@ on:
 permissions:
   contents: write
 
+env:
+  # which model release to run: set the repository variable MODELS_TAG (Settings → Secrets and variables →
+  # Actions → Variables) to e.g. models-v2 after uploading upgraded models; default models-v1
+  MODELS_TAG: ${{ vars.MODELS_TAG || 'models-v1' }}
+
 concurrency:
   group: live
   cancel-in-progress: false
@@ -46,16 +51,17 @@ jobs:
         uses: actions/cache@v4
         with:
           path: models
-          key: models-v1
+          key: ${{ env.MODELS_TAG }}
 
       - name: Download models from the release
         if: steps.models.outputs.cache-hit != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release download models-v1 --dir dl
-          for s in 42 7 1234; do mkdir -p models/seed$s && mv dl/seed$s.pt models/seed$s/glorys_best.pt; done
+          gh release download "$MODELS_TAG" --dir dl
+          for f in dl/seed*.pt; do s=$(basename "$f" .pt); mkdir -p "models/$s" && mv "$f" "models/$s/glorys_best.pt"; done
           mv dl/stats_v2.npz models/stats_v2.npz
+          [ -f dl/sigma_scale.json ] && mv dl/sigma_scale.json models/sigma_scale.json || true
 
       - name: Previous state
         run: |

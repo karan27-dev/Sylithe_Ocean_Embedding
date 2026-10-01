@@ -33,7 +33,7 @@ def _to_dataset(T, S, times, stats, source):
 
 
 @torch.no_grad()
-def reconstruct(models, inputs_path, stats, start, end, window, batch=4):
+def reconstruct(models, inputs_path, stats, start, end, window, batch=4, sigma_scale=None):
     """Daily 3D temperature from surface inputs. `models` may be one network or a list (seed ensemble):
     the ensemble mean is the prediction, and σ² = mean of member variances + spread of member means."""
     models = models if isinstance(models, (list, tuple)) else [models]
@@ -50,7 +50,10 @@ def reconstruct(models, inputs_path, stats, start, end, window, batch=4):
         doy = [int(ds.doy[int(t)]) - 1 for t in b["t"]]
         clim = torch.nan_to_num(torch.tensor(stats["clim"][doy], device=DEV))
         Ts.append((unpad(mu.mean(0) * std) + clim).cpu().numpy())
-        Ss.append(unpad(var.sqrt() * std).cpu().numpy())
+        sig = unpad(var.sqrt() * std).cpu().numpy()
+        if sigma_scale is not None:                           # per-depth calibration fitted on 2022 (upgrades.calibrate)
+            sig = sig * np.asarray(sigma_scale, "f4")[None, :, None, None]
+        Ss.append(sig)
         times += [ds.time[int(t)] for t in b["t"]]
     src = f"Sylithe Ocean Model ({len(models)}-model ensemble) from surface satellite observations only"
     return _to_dataset(np.concatenate(Ts), np.concatenate(Ss), times, stats, src)
